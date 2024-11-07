@@ -6,6 +6,7 @@ struct Query
 end
 
 function add_to_query!(query, symbol, clean, dirty)
+    println("add_to_query")
     clean_id = resolve_dot_expression(query.model, query.class, clean)
     dirty_id = resolve_dot_expression(query.model, query.class, dirty)
     query.cleanmap[symbol] = clean_id
@@ -13,6 +14,7 @@ function add_to_query!(query, symbol, clean, dirty)
 end
 
 macro query(model, body)
+    println("query")
     q = gensym("query")
 
     statements = map(body.args) do e

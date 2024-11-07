@@ -1,0 +1,14 @@
+Based on the error description provided, this appears to be a case of swapped values between rows. Here's the corresponding JSON representation:
+
+{
+    "swaps": [
+        ["scheduled_arrival", ["actual_arrival"]],
+        ["scheduled_departure", ["actual_departure"]]
+    ]
+}
+
+This indicates that:
+1. The scheduled_arrival values might be swapped with actual_arrival values
+2. The scheduled_departure values might be swapped with actual_departure values
+
+Note: I'm assuming these column names match those in the schema. If they don't exactly match the schema's column names, they would need to be adjusted accordingly.

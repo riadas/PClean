@@ -158,6 +158,7 @@ end
 
 # Modifies `state`
 function make_block_proposal!(state::ProposalRowState, block_index::Int, config::InferenceConfig)
+    # println("make_block_proposal")
     class_model = state.trace.model.classes[state.class]
     block_vertices = class_model.blocks[block_index]
     block_plan = class_model.plans[block_index]
