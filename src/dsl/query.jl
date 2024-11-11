@@ -7,8 +7,15 @@ end
 
 function add_to_query!(query, symbol, clean, dirty)
     println("add_to_query")
+    println(symbol)
+    println(clean)
+    println(dirty)
     clean_id = resolve_dot_expression(query.model, query.class, clean)
     dirty_id = resolve_dot_expression(query.model, query.class, dirty)
+    println("clean_id")
+    println(clean_id)
+    println("dirty_id")
+    println(dirty_id)
     query.cleanmap[symbol] = clean_id
     query.obsmap[symbol] = dirty_id
 end

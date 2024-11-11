@@ -34,6 +34,8 @@ end
 
 
 function evaluate_accuracy(dirty_data, clean_data, table, query; verbose=false)
+  println("query.cleanmap")
+  println(query.cleanmap)
   total_errors = 0
   total_changed = 0 # not including imputed
   total_cleaned = 0 # correct repairs; total_changed - total_cleaned gives incorrect repairs
@@ -44,6 +46,12 @@ function evaluate_accuracy(dirty_data, clean_data, table, query; verbose=false)
   pcleaned_rows = [table.rows[i] for i=1:n_rows]
   cleanmap = query.cleanmap
   for (dirty, clean, ours) in zip(eachrow(dirty_data), eachrow(clean_data), pcleaned_rows)
+    # println("dirty")
+    # println(dirty)
+    # println("clean")
+    # println(clean)
+    # println("ours")
+    # println(ours)
     for colname in propertynames(clean_data)
       if !haskey(dirty, colname)
         continue

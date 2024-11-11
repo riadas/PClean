@@ -20,31 +20,55 @@ function generate_program(table_index=1; random=false, custom=nothing)
         end
         error_json = JSON.parse(split(text, "\n\n")[2])
 
+        # remove foreign keys from error json -- already represented elsewhere
+        if "typos" in keys(error_json)
+            foreign_keys = map(t -> t[1], table["foreign_keys"])
+            error_json["typos"] = filter(col -> !(findall(tup -> tup[2] == col, table["column_names"])[1] - 1 in foreign_keys), error_json["typos"])
+        end
+
         # data handling
         dirty_table = CSV.File(custom_data_file) |> DataFrame
+
+        omitted = []
+        if length(names(dirty_table)) != length(table["column_names"])
+            for dirty_name in names(dirty_table)
+                if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), table["column_names"]))
+                    push!(omitted, dirty_name)
+                end
+            end
+        end
+        dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
         
         ## construct possibilities
-        column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], table["column_names"])))
-        column_renaming_dict_reverse = Dict(zip(map(t -> t[2], table["column_names"]), names(dirty_table)))
+        foreign_keys = map(tup -> table["column_names"][tup[1] + 1][2], table["foreign_keys"])
+        column_names_without_foreign_keys = filter(tup -> !(tup[2] in foreign_keys), table["column_names"])
+        if length(omitted) == 0 
+            column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+            column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+        else
+            column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+            column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+        end
 
         possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
         for r in eachrow(dirty_table)
-            for col in names(dirty_table)
+            for col in dirty_columns
                 if !ismissing(r[col]) 
                     push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
                 end
             end
         end
         possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
-        
+        manual_join = false
     else
         if !random 
             table = tables[table_index]
         else
             table = tables[rand(1:length(tables))]
         end
-        error_json = JSON.parse("{}")
-        possibilities = Dict()
+        # error_json = JSON.parse("{}")
+        error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
+        possibilities = Dict([:weight => [100, 200], :height => [68, 72], :killed => [20, 20, 30]])
         
         custom_data_file = table["table_names"][1] * "_dirty.csv"
 
@@ -53,13 +77,14 @@ function generate_program(table_index=1; random=false, custom=nothing)
         cleaned_names = map(t -> replace(t[2], " " => "_"), table["column_names"])
         column_renaming_dict = Dict(zip(dirty_table_names, cleaned_names))
         column_renaming_dict_reverse = Dict(zip(cleaned_names, dirty_table_names))
+        manual_join = true
     end
 
     model_name = join(map(x -> capitalize(x), split(table["db_id"], "_")), "")
 
     if length(keys(error_json)) != 0 && "unit_errors" in keys(error_json)
         scale_factors = unique([1, map(tup -> tup[2], error_json["unit_errors"])...])
-        transformations = map(x -> "Transformation(x -> x/$(x).0, x -> x*$(x).0, x -> 1/$(x).0)", scale_factors)
+        transformations = map(x -> "Transformation(x -> x/$(x)* 1.0, x -> x*$(x)*1.0, x -> 1/$(x)*1.0)", scale_factors)
         units_str = """units = [$(join(transformations, ", "))]"""
     else
         units_str = ""
@@ -96,13 +121,30 @@ function generate_program(table_index=1; random=false, custom=nothing)
     dirty_table = CSV.File("$(custom_data_file)") |> DataFrame
     clean_table = CSV.File(replace("$(custom_data_file)", "dirty.csv" => "clean.csv")) |> DataFrame
 
+    omitted = []
+    if length(names(dirty_table)) != length($(table["column_names"]))
+        for dirty_name in names(dirty_table)
+            if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), $(table["column_names"])))
+                push!(omitted, dirty_name)
+            end
+        end
+    end
+    dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+    
     ## construct possibilities
-    column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], $(table["column_names"]))))
-    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], $(table["column_names"])), names(dirty_table)))
+    foreign_keys = $(map(tup -> table["column_names"][tup[1] + 1][2], table["foreign_keys"]))
+    column_names_without_foreign_keys = $(filter(tup -> !(tup[2] in foreign_keys), table["column_names"]))
+    if length(omitted) == 0 
+        column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+        column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+    else
+        column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+        column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+    end
 
     possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
     for r in eachrow(dirty_table)
-        for col in names(dirty_table)
+        for col in dirty_columns
             if !ismissing(r[col]) 
                 push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
             end
@@ -118,7 +160,7 @@ function generate_program(table_index=1; random=false, custom=nothing)
     $(generate_classes(table, error_json, possibilities))
     end
 
-    $(generate_query(table, error_json, column_renaming_dict_reverse))
+    $(generate_query(table, error_json, column_renaming_dict_reverse, manual_join))
 
     observations = [ObservedDataset(query, dirty_table)]
     config = PClean.InferenceConfig($(size(dirty_table, 1) > 10000 ? 1 : 5), 2; use_mh_instead_of_pg=true)
@@ -136,26 +178,29 @@ function generate_classes(table_json, error_json, possibilities)
 
     class_strings = []
     obs_class_declaration_strings = []
+    non_primary_classes = map(tup -> table_json["table_names"][table_json["column_names"][tup[1] + 1][1] + 1], table_json["foreign_keys"])
     for (index, class) in enumerate(table_json["table_names"])
 
-        formatted_class = join(map(x -> capitalize(x), split(class, " ")), "_")
-        unformatted_class = lowercase(formatted_class[1:1]) * formatted_class[2:end]
-        push!(obs_class_declaration_strings, "$(tab)$(tab)$(unformatted_class) ~ $(formatted_class)")
-
-        # don't include unmodeled first column
-        columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
-        # println(columns)
-        if has_errors && "unit_errors" in keys(error_json)
-            println("YO")
-            columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), columns)
+        if !(class in non_primary_classes)
+            formatted_class = join(map(x -> capitalize(x), split(class, " ")), "_")
+            unformatted_class = lowercase(formatted_class[1:1]) * formatted_class[2:end]
+            push!(obs_class_declaration_strings, "$(tab)$(tab)$(unformatted_class) ~ $(formatted_class)")
+    
+            # don't include unmodeled first column
+            columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
+            # println(columns)
+            if has_errors && "unit_errors" in keys(error_json)
+                println("YO")
+                columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), columns)
+            end
+    
+            formatted_columns = map(tup -> """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior(table_json, index, tup[1], error_json, possibilities))""", enumerate(filter(x -> x[1] == index - 1, columns)))
+    
+            class_str = """$(tab)@class $(formatted_class) begin
+        $(join(formatted_columns, "\n"))
+        $(tab)end"""
+            push!(class_strings, class_str)
         end
-
-        formatted_columns = map(tup -> """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior(table_json, index, tup[1], error_json, possibilities))""", enumerate(filter(x -> x[1] == index - 1, columns)))
-
-        class_str = """$(tab)@class $(formatted_class) begin
-    $(join(formatted_columns, "\n"))
-    $(tab)end"""
-        push!(class_strings, class_str)
     end
 
     # generate Obs class 
@@ -171,23 +216,35 @@ function generate_classes(table_json, error_json, possibilities)
                 # create a class for the variation column
                 formatted_class = join(map(x -> capitalize(x), split(variation_column, " ")), "_")
 
+                println(columns)
                 columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
                 if has_errors && "unit_errors" in keys(error_json)
                     println("YO")
                     columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), table_json["column_names"])
                 end
 
-                variation_column_index = findall(tup -> tup[1] == 0 && tup[2] == variation_column, columns)[1]
-                prior = "$(variation_column) ~ $(generate_prior(table_json, 1, variation_column_index, error_json, possibilities))"
+                println("WHAT")
+                println(columns)
+                println(variation_column)
+                variation_column_index = findall(tup -> tup[2] == variation_column, columns)[1]
+                class_index = columns[variation_column_index][1]
+                variation_column_index = findall(tup -> tup[2] == variation_column, filter(t -> t[1] == class_index, columns))[1]
+                println("variation_column_index")
+                println(variation_column_index)
+                println("class_index")
+                println(class_index)
+                prior = "$(variation_column) ~ $(generate_prior(table_json, class_index + 1, variation_column_index, error_json, possibilities))"
                 class_str = """$(tab)@class $(formatted_class) begin
                 $(tab)$(tab)$(prior)
                 $(tab)end"""
                 # println(class_strings)
                 # println(prior)
-                old_class_str = filter(s -> occursin(prior, s), class_strings)[1]
-                fixed_class_str = replace(replace(old_class_str, prior => ";"), "$(tab)$(tab);\n" => "")
-                class_strings = filter(s -> !occursin(prior, s), class_strings)
-                class_strings = [class_str, fixed_class_str, class_strings...]
+                if filter(s -> occursin(prior, s), class_strings) != [] 
+                    old_class_str = filter(s -> occursin(prior, s), class_strings)[1]
+                    fixed_class_str = replace(replace(old_class_str, prior => ";"), "$(tab)$(tab);\n" => "")
+                    class_strings = filter(s -> !occursin(prior, s), class_strings)
+                    class_strings = [class_str, fixed_class_str, class_strings...]
+                end
 
                 error_decl_str = "$(tab)$(tab)@learned error_probs::Dict{String, ProbParameter{10.0, 50.0}}"    
                 error_def_str = "$(tab)$(tab)error_prob_$(variation_column) = error_probs[$(variation_column).$(variation_column)]"
@@ -206,58 +263,114 @@ function generate_classes(table_json, error_json, possibilities)
         variation_columns = []
     end
 
-    for (index, column) in enumerate(table_json["column_names"])
-        # keep column as long as it's not the FK in a FK-PK pair
-        if column[1] != -1 && !((index - 1) in map(tup -> tup[1], table_json["foreign_keys"]))
-            
-            original_table_name = table_json["table_names"][column[1] + 1]
-            table_name = join(map(x -> capitalize(x), split(table_json["table_names"][column[1] + 1], " ")), "_")
-            table_name = lowercase(table_name[1:1]) * table_name[2:end]
-            original_column_name = column[2]
-            column_name = replace(original_column_name, " " => "_")
+    columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
+    # println(columns)
+    if has_errors && "unit_errors" in keys(error_json)
+        println("YO")
+        columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), columns)
+    end
 
-            if index == 1 && occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"]
-                continue
-            end
-            # if !occursin(lowercase(table_name), lowercase(column_name))
-            #     column_name = "$(lowercase(table_name))_$(column_name)"
-            # end
+    handled = Dict()
+    loops = 0
+    while length(keys(handled)) != length(table_json["column_names"])
+        loops += 1 
+        println("loops")
+        println(loops)
+        for (index, column) in enumerate(table_json["column_names"])
+            # keep column as long as it's not the FK in a FK-PK pair
+            println(column)
+            if column[1] != -1 && !((index - 1) in map(tup -> tup[1], table_json["foreign_keys"]))
+                println(column)
+                original_table_name = table_json["table_names"][column[1] + 1]
+                table_name = join(map(x -> capitalize(x), split(table_json["table_names"][column[1] + 1], " ")), "_")
+                table_name = lowercase(table_name[1:1]) * table_name[2:end]
+                original_column_name = column[2]
+                column_name = replace(original_column_name, " " => "_")
 
-            if column_name in variation_columns
-                formatted_column_name = join(map(x -> capitalize(x), split(column_name, " ")), "_")
-                obs_column_str = "$(tab)$(tab)$(column_name) ~ $(formatted_column_name)"
-                obs_column_strings = [obs_column_strings[1], obs_column_str, obs_column_strings[2:end]...]
-                continue
-            else
-                if has_errors 
-                    if "typos" in keys(error_json) && original_column_name in error_json["typos"]
-                        obs_column_str = "$(tab)$(tab)$(column_name) ~ AddTypos($(table_name).$(column_name), 2)"
-                    elseif "unit_errors" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["unit_errors"])
-                        avg = Statistics.mean(possibilities[Symbol(column_name)])
-                        st_dev = Statistics.std(possibilities[Symbol(column_name)])
-                        learned_param_str = "@learned avg_$(column_name)::Dict{String, MeanParameter{$(avg), $(st_dev)}}"
-                        unit_str = "unit ~ ChooseUniformly(units)"
-    
-                        text_column_names = map(x -> table_json["column_names"][x[1]][2], filter(tup -> tup[2] == "text" && table_json["column_names"][tup[1]][1] == column[1], [enumerate(table_json["column_types"])...]))
-                        formatted_text_column_names = join(map(t -> "\$($(table_name).$(t))", text_column_names), "_")
-                        base_str = """$(column_name)_base = avg_$(column_name)["$(formatted_text_column_names)"]"""
-                        error_str = """$(column_name) ~ TransformedGaussian($(column_name)_base, $(st_dev)/10, unit)"""
-                        corrected_str = "$(column_name)_corrected = round(unit.backward($(column_name)))"
-                        obs_column_str = join(map(line -> "$(tab)$(tab)$(line)", [learned_param_str, unit_str, base_str, error_str, corrected_str]), "\n")
-                    elseif "swaps" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["swaps"])
-                        swap_column_name = filter(tup -> tup[1] == original_column_name, error_json["swaps"])[1][2][1] 
-                        variation_column_name = filter(tup -> tup[1] == original_column_name, error_json["swaps"])[1][3] 
-                        obs_column_str = """$(tab)$(tab)$(column_name) ~ MaybeSwap($(table_name).$(column_name), swap_possibilities["\$($(table_name).$(swap_column_name))-$(column_name)"], error_prob_$(variation_column_name))"""
+                if index == 1 && occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"]
+                    handled[string(index) * "_" * string(column[2])] = true
+                    continue
+                end
+
+                # if !occursin(lowercase(table_name), lowercase(column_name))
+                #     column_name = "$(lowercase(table_name))_$(column_name)"
+                # end
+
+                if column_name in variation_columns
+                    formatted_column_name = join(map(x -> capitalize(x), split(column_name, " ")), "_")
+                    obs_column_str = "$(tab)$(tab)$(column_name) ~ $(formatted_column_name)"
+                    obs_column_strings = [obs_column_strings[1], obs_column_str, obs_column_strings[2:end]...]
+                    handled[string(index) * "_" * string(column[2])] = true
+                    continue
+                else
+                    if has_errors 
+                        if "typos" in keys(error_json) && original_column_name in error_json["typos"]
+                            println(original_column_name)
+                            if original_table_name in non_primary_classes 
+                                class_index = column[1] + 1
+                                col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]    
+                                obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
+                                obs_err_str = "$(tab)$(tab)$(column_name)_typo ~ AddTypos($(column_name), 2)"
+                                obs_column_str = join([obs_column_str, obs_err_str], "\n")
+                            else
+                                obs_column_str = "$(tab)$(tab)$(column_name) ~ AddTypos($(table_name).$(column_name), 2)"
+                            end
+                        elseif "unit_errors" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["unit_errors"])
+                            avg = Statistics.mean(possibilities[Symbol(column_name)])
+                            st_dev = Statistics.std(possibilities[Symbol(column_name)])
+                            learned_param_str = "@learned avg_$(column_name)::Dict{String, MeanParameter{$(avg), $(st_dev)}}"
+                            unit_str = "unit_$(column_name) ~ ChooseUniformly(units)"
+                            # TODO: need to ensure that these are declared first! and swap column is declared first in below case!
+                            text_column_names = map(x -> table_json["column_names"][x[1]], filter(tup -> tup[2] == "text" && table_json["column_names"][tup[1]][1] == column[1], [enumerate(table_json["column_types"])...]))
+                            for tup in text_column_names
+                                k = string(tup[1]) * "_" * string(tup[2])
+                                if !(k in keys(handled)) && (original_table_name in non_primary_classes)
+                                    continue
+                                end
+                            end
+                            formatted_text_column_names = join(map(tup -> table_json["table_names"][tup[1] + 1] in non_primary_classes ? """\$($(replace(tup[2], " " => "_")))""" : """\$($(table_name).$(replace(tup[2], " " => "_")))""", text_column_names), "_")
+                            base_str = """$(column_name)_base = avg_$(column_name)["$(formatted_text_column_names)"]"""
+                            error_str = """$(column_name) ~ TransformedGaussian($(column_name)_base, $(st_dev)/10, unit_$(column_name))"""
+                            corrected_str = "$(column_name)_corrected = round(unit_$(column_name).backward($(column_name)))"
+                            obs_column_str = join(map(line -> "$(tab)$(tab)$(line)", [learned_param_str, unit_str, base_str, error_str, corrected_str]), "\n")
+                        elseif "swaps" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["swaps"])
+                            swap_column_name = filter(tup -> tup[1] == original_column_name, error_json["swaps"])[1][2][1] 
+                            variation_column_name = filter(tup -> tup[1] == original_column_name, error_json["swaps"])[1][3] 
+                            k = string(index) * "_" * swap_column_name
+                            if (original_table_name in non_primary_classes) && !(k in keys(handled))
+                                continue
+                            end
+                            
+                            if original_table_name in non_primary_classes  
+                                obs_column_str = """$(tab)$(tab)$(column_name)_swap ~ MaybeSwap($(column_name), swap_possibilities["\$($(swap_column_name))-$(column_name)"], error_prob_$(variation_column_name))"""
+                            else
+                                obs_column_str = """$(tab)$(tab)$(column_name) ~ MaybeSwap($(table_name).$(column_name), swap_possibilities["\$($(table_name).$(swap_column_name))-$(column_name)"], error_prob_$(variation_column_name))"""                                
+                            end
+                        elseif original_table_name in non_primary_classes
+                            # no error, but this field still needs to be instantiated b/c it is not in a primary table
+                            class_index = column[1] + 1
+                            col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]
+                            obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
+                        else 
+                            handled[string(index) * "_" * string(column[2])] = true
+                            continue
+                            # obs_column_str = "$(tab)$(tab)$(column_name) ~ $(table_name).$(column_name)"
+                        end
+                    elseif original_table_name in non_primary_classes
+                        class_index = column[1] + 1
+                        col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]
+                        obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
                     else
+                        handled[string(index) * "_" * string(column[2])] = true
                         continue
                         # obs_column_str = "$(tab)$(tab)$(column_name) ~ $(table_name).$(column_name)"
                     end
-                else
-                    continue
-                    # obs_column_str = "$(tab)$(tab)$(column_name) ~ $(table_name).$(column_name)"
                 end
+                handled[string(index) * "_" * string(column[2])] = true
+                push!(obs_column_strings, obs_column_str)
+            else
+                handled[string(index) * "_" * string(column[2])] = true
             end
-            push!(obs_column_strings, obs_column_str)
         end
     end
     class_str = """$(tab)@class Obs begin
@@ -268,9 +381,10 @@ function generate_classes(table_json, error_json, possibilities)
     join(class_strings, "\n\n")
 end
 
-function generate_query(table_json, error_json, column_renaming_dict_reverse)
+function generate_query(table_json, error_json, column_renaming_dict_reverse, manual_join)
     has_errors = length(keys(error_json)) != 0
     query_column_strings = []
+    non_primary_classes = map(tup -> table_json["table_names"][table_json["column_names"][tup[1] + 1][1] + 1], table_json["foreign_keys"])
     for (index, column) in enumerate(table_json["column_names"])
         # keep column as long as it's not the FK in a FK-PK pair
         if column[1] != -1 && !((index - 1) in map(tup -> tup[1], table_json["foreign_keys"]))
@@ -280,7 +394,7 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse)
             table_name = lowercase(table_name[1:1]) * table_name[2:end]
             original_column_name = column[2]
             column_name = replace(original_column_name, " " => "_")
-            if length(table_json["table_names"]) > 1 # manual joining case -- we change all the column names
+            if manual_join # length(table_json["table_names"]) > 1 # manual joining case -- we change all the column names
                 if !occursin(lowercase(table_name), lowercase(column_name))
                     query_column_name = "$(lowercase(table_name))_$(column_name)"
                 else
@@ -301,18 +415,30 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse)
 
             if has_errors 
                 if "typos" in keys(error_json) && original_column_name in error_json["typos"]
-                    obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
+                    if original_table_name in non_primary_classes 
+                        obs_column_str = "$(tab)$(query_column_name) $(column_name) $(column_name)_typo"
+                    else
+                        obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
+                    end
                 elseif "unit_errors" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["unit_errors"])
                     obs_column_str = "$(tab)$(query_column_name) $(column_name)_corrected $(column_name)"
                 elseif "swaps" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["swaps"])
-                    obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
+                    if original_table_name in non_primary_classes
+                        obs_column_str = "$(tab)$(query_column_name) $(column_name) $(column_name)_swap"
+                    else
+                        obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
+                    end
                 elseif "swaps" in keys(error_json) && original_column_name in map(tup -> tup[3], error_json["swaps"])
                     obs_column_str = "$(tab)$(query_column_name) $(column_name).$(column_name)"
                 else
                     obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
                 end
             else 
-                obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
+                if original_table_name in non_primary_classes 
+                    obs_column_str = "$(tab)$(query_column_name) $(column_name)"
+                else
+                    obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
+                end
             end
             push!(query_column_strings, obs_column_str)
         end
@@ -334,6 +460,9 @@ function generate_prior(table_json, class_index, col_index, error_json, ps)
         println("YO")
         columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), columns)
     end
+    println(columns)
+    println(class_index)
+    println(col_index)
     column_name = filter(tup -> tup[1] == class_index - 1, columns)[col_index][2]
 
     all_columns_index = findfirst(tup -> tup[1] == class_index - 1 && tup[2] == column_name, table_json["column_names"])
@@ -376,14 +505,14 @@ function capitalize(str)
 end
 
 
-for i in 1:length(tables)
-    println(i)
-    t = tables[i]
-    name = join(map(x -> capitalize(x), split(t["db_id"], "_")), "")
-    open("src/generator/generated_programs/$(string(i))_$(name).jl", "w+") do file
-        write(file, generate_program(i))
-    end
-end
+# for i in 1:length(tables)
+#     println(i)
+#     t = tables[i]
+#     name = join(map(x -> capitalize(x), split(t["db_id"], "_")), "")
+#     open("src/generator/generated_programs/$(string(i))_$(name).jl", "w+") do file
+#         write(file, generate_program(i))
+#     end
+# end
 
 # test_name = ARGS[1]
 

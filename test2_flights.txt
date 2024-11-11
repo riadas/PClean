@@ -1,0 +1,15 @@
+Based on the error description provided, this appears to be a case of swapped values, where arrival and departure times might be incorrectly swapped between different sources for the same flight. Here's the appropriate error JSON:
+
+{
+  "swaps": [
+    ["sched_dep_time", ["flight"]],
+    ["act_dep_time", ["flight"]],
+    ["sched_arr_time", ["flight"]],
+    ["act_arr_time", ["flight"]]
+  ]
+}
+
+This JSON indicates that:
+- The time values (both scheduled and actual, for both arrival and departure) might be swapped between rows that share the same flight number
+- I've used "flight" as the identifying column since it uniquely identifies a specific flight route
+- I've omitted "typos" and "unit_errors" since the error description doesn't mention any issues related to those error types

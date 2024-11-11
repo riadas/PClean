@@ -1,0 +1,33 @@
+Based on the dataset excerpt, I'll create a "table.json" file with the specified schema information. The data appears to be about flight schedules with departure and arrival times.
+
+{
+  "db_id": "flight_schedules",
+  "table_names": ["flights"],
+  "column_names": [
+    [0, "tuple_id"],
+    [0, "src"],
+    [0, "flight"],
+    [0, "sched_dep_time"],
+    [0, "act_dep_time"],
+    [0, "sched_arr_time"],
+    [0, "act_arr_time"]
+  ],
+  "column_types": [
+    "number",
+    "text",
+    "text",
+    "time",
+    "time",
+    "time",
+    "time"
+  ],
+  "foreign_keys": [],
+  "primary_keys": [0]
+}
+
+This schema represents:
+- A single table named "flights"
+- 7 columns with their respective data types
+- tuple_id as the primary key
+- No foreign keys since this is a single table
+- Appropriate data types for each column (number for IDs, text for source and flight numbers, time for all time-related fields)
