@@ -7,6 +7,7 @@ using Statistics
 dirty_table = CSV.File("datasets/rents_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("datasets/rents_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
 omitted = []
 if length(names(dirty_table)) != length(Any[Any[0, "id"], Any[0, "room_type"], Any[0, "monthly_rent"], Any[0, "county"], Any[0, "state"]])
     for dirty_name in names(dirty_table)

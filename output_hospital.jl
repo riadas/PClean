@@ -6,6 +6,9 @@ using Statistics
 # data handling
 dirty_table = CSV.File("datasets/hospital_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("datasets/hospital_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
+clean_table[!, :PhoneNumber] = map(x -> "$x", clean_table[!, :PhoneNumber])
+clean_table[!, :ZipCode] = map(x -> "$x", clean_table[!, :ZipCode])
+clean_table[!, :ProviderNumber] = map(x -> "$x", clean_table[!, :ProviderNumber])
 
 omitted = []
 if length(names(dirty_table)) != length(Any[Any[0, "provider_number"], Any[0, "hospital_name"], Any[0, "address1"], Any[0, "city"], Any[0, "state"], Any[0, "zip_code"], Any[0, "county_name"], Any[0, "phone_number"], Any[0, "hospital_type"], Any[0, "hospital_owner"], Any[0, "emergency_service"], Any[1, "measure_code"], Any[1, "measure_name"], Any[1, "condition"], Any[2, "hospital_id"], Any[2, "measure_id"], Any[2, "state_avg"]])

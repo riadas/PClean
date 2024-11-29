@@ -7,7 +7,7 @@ using DataFrames: DataFrame
 tables = JSON.parsefile("src/generator/spider_data/tables.json")
 spaces = 4
 tab = join(map(x -> " ", 1:spaces))
-function generate_program(table_index=1; random=false, custom=nothing)
+function generate_program2(table_index=1; random=false, custom=nothing)
     if !isnothing(custom)
         custom_schema_file, custom_error_file, custom_data_file = custom
         open(custom_schema_file) do f 
@@ -75,9 +75,10 @@ function generate_program(table_index=1; random=false, custom=nothing)
         else
             table = tables[rand(1:length(tables))]
         end
-        # error_json = JSON.parse("{}")
-        error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
-        possibilities = Dict([:weight => [100, 200], :height => [68, 72], :killed => [20, 20, 30]])
+        error_json = JSON.parse("{}")
+        possibilities = JSON.parse("{}")
+        # error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
+        # possibilities = Dict([:weight => [100, 200], :height => [68, 72], :killed => [20, 20, 30]])
         
         # remove foreign keys from error json -- already represented elsewhere
         if "typos" in keys(error_json)
@@ -197,13 +198,20 @@ function generate_classes(table_json, error_json, possibilities)
     class_strings = []
     obs_class_declaration_strings = []
     non_primary_classes = map(tup -> table_json["table_names"][table_json["column_names"][tup[1] + 1][1] + 1], table_json["foreign_keys"])
-    for (index, class) in enumerate(table_json["table_names"])
+    while length(class_strings) != length(table_json["table_names"])
+        println("LENGTH?")
+        println(length(class_strings))
+        for (index, class) in enumerate(table_json["table_names"])
 
-        if !(class in non_primary_classes)
             formatted_class = join(map(x -> capitalize(x), split(class, " ")), "_")
             unformatted_class = lowercase(formatted_class[1:1]) * formatted_class[2:end]
-            push!(obs_class_declaration_strings, "$(tab)$(tab)$(unformatted_class) ~ $(formatted_class)")
-    
+            # push!(obs_class_declaration_strings, "$(tab)$(tab)$(unformatted_class) ~ $(formatted_class)")
+            println("formatted_class")
+            println(formatted_class)
+            println(class_strings)
+            if occursin("@class $(formatted_class)", join(class_strings, "")) 
+                continue
+            end
             # don't include unmodeled first column
             columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
             # println(columns)
@@ -211,18 +219,55 @@ function generate_classes(table_json, error_json, possibilities)
                 println("YO")
                 columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), columns)
             end
-    
-            formatted_columns = map(tup -> """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior(table_json, index, tup[1], error_json, possibilities))""", enumerate(filter(x -> x[1] == index - 1, columns)))
-    
+
+            foreign_key_tuples = map(tup -> table_json["column_names"][tup[1] + 1], table_json["foreign_keys"])
+            formatted_columns = []
+            precendent_missing = false
+            for tup in enumerate(filter(x -> x[1] == index - 1, columns))
+                if tup[2] in foreign_key_tuples
+                    col_index = findall(x -> x == tup[2], table_json["column_names"])[1]
+                    foreign_col_index = 1 + filter(pair -> pair[1] == col_index - 1, table_json["foreign_keys"])[1][2]
+                    foreign_table_index = table_json["column_names"][foreign_col_index][1] + 1
+                    foreign_class = table_json["table_names"][foreign_table_index]
+                    formatted_foreign_class = join(map(x -> capitalize(x), split(foreign_class, " ")), "_")
+                    unformatted_foreign_class = lowercase(formatted_foreign_class[1:1]) * formatted_foreign_class[2:end]
+                    
+                    # check if precedent class has already been constructed
+                    if !occursin("@class $(formatted_foreign_class)", join(class_strings, "")) 
+                        precendent_missing = true
+                        break
+                    end
+
+                    formatted_col = """$(tab)$(tab)$(unformatted_foreign_class) ~ $(formatted_foreign_class)"""
+                    push!(formatted_columns, formatted_col)
+                else
+                    formatted_col = """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior(table_json, index, tup[1], error_json, possibilities))"""
+                    push!(formatted_columns, formatted_col)
+                end
+            end
+
+            if precendent_missing 
+                continue
+            end
+
             class_str = """$(tab)@class $(formatted_class) begin
         $(join(formatted_columns, "\n"))
         $(tab)end"""
             push!(class_strings, class_str)
+            
         end
     end
 
     # generate Obs class 
-    ## generate Obs columns: union of all columns minus join columns
+    ## classes to declare in Obs are those without any foreign key references to them 
+    foreign_tables = map(tup -> table_json["table_names"][table_json["column_names"][tup[2] + 1][1] + 1], table_json["foreign_keys"])
+    for class in table_json["table_names"]
+        if !(class in foreign_tables)
+            formatted_class = join(map(x -> capitalize(x), split(class, " ")), "_")
+            unformatted_class = lowercase(formatted_class[1:1]) * formatted_class[2:end]
+            push!(obs_class_declaration_strings, "$(tab)$(tab)$(unformatted_class) ~ $(formatted_class)")
+        end
+    end
     obs_column_strings = obs_class_declaration_strings
 
     if "swaps" in keys(error_json)
@@ -374,10 +419,6 @@ function generate_classes(table_json, error_json, possibilities)
                             continue
                             # obs_column_str = "$(tab)$(tab)$(column_name) ~ $(table_name).$(column_name)"
                         end
-                    elseif original_table_name in non_primary_classes
-                        class_index = column[1] + 1
-                        col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]
-                        obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
                     else
                         handled[string(index) * "_" * string(column[2])] = true
                         continue
@@ -397,6 +438,41 @@ function generate_classes(table_json, error_json, possibilities)
     push!(class_strings, class_str)
 
     join(class_strings, "\n\n")
+end
+
+function compute_table_prefix(column_index, table_json)
+    println("compute_table_prefix")
+    println("column_index")
+    println(column_index)
+    table_index = table_json["column_names"][column_index][1] + 1
+    table_name = table_json["table_names"][table_index]
+    foreign_tables = map(tup -> table_json["table_names"][table_json["column_names"][tup[2] + 1][1] + 1], table_json["foreign_keys"])
+    top_level_tables = filter(t -> !(t in foreign_tables), table_json["table_names"])
+    if table_name in top_level_tables 
+        table_name = join(map(x -> capitalize(x), split(table_name, " ")), "_")
+        table_name = lowercase(table_name[1:1]) * table_name[2:end]
+        return table_name
+    else # find path to table_name, starting at top-most tables
+        table_list = [table_name]
+        curr_column_index = column_index
+        curr_table = table_name 
+        while !(curr_table in top_level_tables)
+            curr_table_index = findall(x -> x == curr_table, table_json["table_names"])[1] - 1
+            curr_table_col_indices = filter(tup -> tup[1] == curr_table_index, table_json["column_names"])
+            curr_table_col_indices = findall(x -> x in curr_table_col_indices, table_json["column_names"])
+            referring_foreign_key_pairs = filter(tup -> tup[2] + 1 in curr_table_col_indices, table_json["foreign_keys"])
+            
+            referencing_column_index = referring_foreign_key_pairs[1][1]
+            referencing_table_index = table_json["column_names"][referencing_column_index][1] + 1
+            referencing_table = table_json["table_names"][referencing_table_index]
+            curr_table = referencing_table
+        
+            push!(table_list, curr_table)
+        end
+        formatted_table_names = map(table_name -> join(map(x -> capitalize(x), split(table_name, " ")), "_"), reverse(table_list))
+        formatted_table_names = map(table_name -> lowercase(table_name[1:1]) * table_name[2:end], formatted_table_names)        
+        return join(formatted_table_names, ".")
+    end
 end
 
 function generate_query(table_json, error_json, column_renaming_dict_reverse, manual_join)
@@ -426,6 +502,9 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
                 end
             end
 
+            ## compute "." path to foreign key reference
+            table_name = compute_table_prefix(index, table_json)
+
             # don't include unmodeled first column
             if occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"] && table_json["column_names"][1][2] == column_name
                 continue
@@ -452,11 +531,7 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
                     obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
                 end
             else 
-                if original_table_name in non_primary_classes 
-                    obs_column_str = "$(tab)$(query_column_name) $(column_name)"
-                else
-                    obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
-                end
+                obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
             end
             push!(query_column_strings, obs_column_str)
         end

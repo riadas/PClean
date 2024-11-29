@@ -2,6 +2,9 @@ using PClean
 
 include("load_data.jl")
 
+# dirty_table = first(dirty_table, 1000)
+# clean_table = first(clean_table, 1000)
+
 units = [Transformation(identity, identity, x -> 1.0),
         Transformation(x -> x/1000.0, x -> x*1000.0, x -> 1/1000.0)]
 
