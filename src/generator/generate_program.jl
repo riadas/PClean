@@ -75,10 +75,10 @@ function generate_program(table_index=1; random=false, custom=nothing)
         else
             table = tables[rand(1:length(tables))]
         end
-        # error_json = JSON.parse("{}")
-        error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
-        possibilities = Dict([:weight => [100, 200], :height => [68, 72], :killed => [20, 20, 30]])
-        
+        error_json = JSON.parse("{}")
+        # error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
+        # possibilities = Dict([:weight => [100, 200], :height => [68, 72], :killed => [20, 20, 30]])
+        possibilities = Dict()
         # remove foreign keys from error json -- already represented elsewhere
         if "typos" in keys(error_json)
             foreign_keys = map(t -> t[1], table["foreign_keys"])

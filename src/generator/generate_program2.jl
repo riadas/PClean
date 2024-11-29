@@ -2,7 +2,7 @@ using JSON
 using Statistics 
 using CSV
 using DataFrames: DataFrame
-
+using DataStructures
 
 tables = JSON.parsefile("src/generator/spider_data/tables.json")
 spaces = 4
@@ -75,7 +75,8 @@ function generate_program2(table_index=1; random=false, custom=nothing)
         else
             table = tables[rand(1:length(tables))]
         end
-        error_json = JSON.parse("{}")
+        table_json["table_names"] = map(x -> replace(x, " " => "_"), table_json["table_names"])
+        error_json = JSON.parse("""{}""")
         possibilities = JSON.parse("{}")
         # error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
         # possibilities = Dict([:weight => [100, 200], :height => [68, 72], :killed => [20, 20, 30]])
@@ -369,15 +370,7 @@ function generate_classes(table_json, error_json, possibilities)
                     if has_errors 
                         if "typos" in keys(error_json) && original_column_name in error_json["typos"]
                             println(original_column_name)
-                            if original_table_name in non_primary_classes 
-                                class_index = column[1] + 1
-                                col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]    
-                                obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
-                                obs_err_str = "$(tab)$(tab)$(column_name)_typo ~ AddTypos($(column_name), 2)"
-                                obs_column_str = join([obs_column_str, obs_err_str], "\n")
-                            else
-                                obs_column_str = "$(tab)$(tab)$(column_name) ~ AddTypos($(table_name).$(column_name), 2)"
-                            end
+                            obs_column_str = "$(tab)$(tab)$(column_name) ~ AddTypos($(compute_table_prefix(index, table_json)).$(column_name), 2)"
                         elseif "unit_errors" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["unit_errors"])
                             avg = Statistics.mean(possibilities[Symbol(column_name)])
                             st_dev = Statistics.std(possibilities[Symbol(column_name)])
@@ -385,12 +378,6 @@ function generate_classes(table_json, error_json, possibilities)
                             unit_str = "unit_$(column_name) ~ ChooseUniformly(units)"
                             # TODO: need to ensure that these are declared first! and swap column is declared first in below case!
                             text_column_names = map(x -> table_json["column_names"][x[1]], filter(tup -> tup[2] == "text" && table_json["column_names"][tup[1]][1] == column[1], [enumerate(table_json["column_types"])...]))
-                            for tup in text_column_names
-                                k = string(tup[1]) * "_" * string(tup[2])
-                                if !(k in keys(handled)) && (original_table_name in non_primary_classes)
-                                    continue
-                                end
-                            end
                             formatted_text_column_names = join(map(tup -> table_json["table_names"][tup[1] + 1] in non_primary_classes ? """\$($(replace(tup[2], " " => "_")))""" : """\$($(table_name).$(replace(tup[2], " " => "_")))""", text_column_names), "_")
                             base_str = """$(column_name)_base = avg_$(column_name)["$(formatted_text_column_names)"]"""
                             error_str = """$(column_name) ~ TransformedGaussian($(column_name)_base, $(st_dev)/10, unit_$(column_name))"""
@@ -400,20 +387,8 @@ function generate_classes(table_json, error_json, possibilities)
                             swap_column_name = filter(tup -> tup[1] == original_column_name, error_json["swaps"])[1][2][1] 
                             variation_column_name = filter(tup -> tup[1] == original_column_name, error_json["swaps"])[1][3] 
                             k = string(index) * "_" * swap_column_name
-                            if (original_table_name in non_primary_classes) && !(k in keys(handled))
-                                continue
-                            end
                             
-                            if original_table_name in non_primary_classes  
-                                obs_column_str = """$(tab)$(tab)$(column_name)_swap ~ MaybeSwap($(column_name), swap_possibilities["\$($(swap_column_name))-$(column_name)"], error_prob_$(variation_column_name))"""
-                            else
-                                obs_column_str = """$(tab)$(tab)$(column_name) ~ MaybeSwap($(table_name).$(column_name), swap_possibilities["\$($(table_name).$(swap_column_name))-$(column_name)"], error_prob_$(variation_column_name))"""                                
-                            end
-                        elseif original_table_name in non_primary_classes
-                            # no error, but this field still needs to be instantiated b/c it is not in a primary table
-                            class_index = column[1] + 1
-                            col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]
-                            obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
+                            obs_column_str = """$(tab)$(tab)$(column_name) ~ MaybeSwap($(compute_table_prefix(index, table_json)).$(column_name), swap_possibilities["\$($(compute_table_prefix(index, table_json)).$(swap_column_name))-$(column_name)"], error_prob_$(variation_column_name))"""
                         else 
                             handled[string(index) * "_" * string(column[2])] = true
                             continue
@@ -453,23 +428,32 @@ function compute_table_prefix(column_index, table_json)
         table_name = lowercase(table_name[1:1]) * table_name[2:end]
         return table_name
     else # find path to table_name, starting at top-most tables
-        table_list = [table_name]
-        curr_column_index = column_index
-        curr_table = table_name 
-        while !(curr_table in top_level_tables)
+        table_path = Dict()
+        queue = Queue{String}()
+        enqueue!(queue, table_name)
+        while !(first(queue) in top_level_tables)
+            println("yo")
+            curr_table = dequeue!(queue)
             curr_table_index = findall(x -> x == curr_table, table_json["table_names"])[1] - 1
             curr_table_col_indices = filter(tup -> tup[1] == curr_table_index, table_json["column_names"])
             curr_table_col_indices = findall(x -> x in curr_table_col_indices, table_json["column_names"])
             referring_foreign_key_pairs = filter(tup -> tup[2] + 1 in curr_table_col_indices, table_json["foreign_keys"])
             
-            referencing_column_index = referring_foreign_key_pairs[1][1]
-            referencing_table_index = table_json["column_names"][referencing_column_index][1] + 1
-            referencing_table = table_json["table_names"][referencing_table_index]
-            curr_table = referencing_table
-        
+            for pair in referring_foreign_key_pairs 
+                referencing_column_index = pair[1] + 1
+                referencing_table_index = table_json["column_names"][referencing_column_index][1] + 1
+                referencing_table = table_json["table_names"][referencing_table_index]
+                enqueue!(queue, referencing_table)
+                table_path[referencing_table] = curr_table
+            end
+        end
+        curr_table = first(queue)
+        table_list = [curr_table]
+        while curr_table != table_name 
+            curr_table = table_path[curr_table]
             push!(table_list, curr_table)
         end
-        formatted_table_names = map(table_name -> join(map(x -> capitalize(x), split(table_name, " ")), "_"), reverse(table_list))
+        formatted_table_names = map(table_name -> join(map(x -> capitalize(x), split(table_name, " ")), "_"), table_list)
         formatted_table_names = map(table_name -> lowercase(table_name[1:1]) * table_name[2:end], formatted_table_names)        
         return join(formatted_table_names, ".")
     end
@@ -512,19 +496,11 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
 
             if has_errors 
                 if "typos" in keys(error_json) && original_column_name in error_json["typos"]
-                    if original_table_name in non_primary_classes 
-                        obs_column_str = "$(tab)$(query_column_name) $(column_name) $(column_name)_typo"
-                    else
-                        obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
-                    end
+                    obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
                 elseif "unit_errors" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["unit_errors"])
                     obs_column_str = "$(tab)$(query_column_name) $(column_name)_corrected $(column_name)"
                 elseif "swaps" in keys(error_json) && original_column_name in map(tup -> tup[1], error_json["swaps"])
-                    if original_table_name in non_primary_classes
-                        obs_column_str = "$(tab)$(query_column_name) $(column_name) $(column_name)_swap"
-                    else
-                        obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
-                    end
+                    obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name) $(column_name)"
                 elseif "swaps" in keys(error_json) && original_column_name in map(tup -> tup[3], error_json["swaps"])
                     obs_column_str = "$(tab)$(query_column_name) $(column_name).$(column_name)"
                 else
