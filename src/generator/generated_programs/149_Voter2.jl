@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("student_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("student_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "student id"], Any[0, "last name"], Any[0, "first name"], Any[0, "age"], Any[0, "sex"], Any[0, "major"], Any[0, "advisor"], Any[0, "city code"], Any[1, "student id"], Any[1, "registration date"], Any[1, "election cycle"], Any[1, "president vote"], Any[1, "vice president vote"], Any[1, "secretary vote"], Any[1, "treasurer vote"], Any[1, "class president vote"], Any[1, "class senator vote"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "student id"], Any[0, "last name"], Any[0, "first name"], Any[0, "age"], Any[0, "sex"], Any[0, "major"], Any[0, "advisor"], Any[0, "city code"], Any[1, "student id"], Any[1, "registration date"], Any[1, "election cycle"], Any[1, "president vote"], Any[1, "vice president vote"], Any[1, "secretary vote"], Any[1, "treasurer vote"], Any[1, "class president vote"], Any[1, "class senator vote"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "student id"], Any[0, "last name"], Any[0, "first name"], Any[0, "age"], Any[0, "sex"], Any[0, "major"], Any[0, "advisor"], Any[0, "city code"], Any[1, "student id"], Any[1, "registration date"], Any[1, "election cycle"], Any[1, "president vote"], Any[1, "vice president vote"], Any[1, "secretary vote"], Any[1, "treasurer vote"], Any[1, "class president vote"], Any[1, "class senator vote"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "student id"], Any[0, "last name"], Any[0, "first name"], Any[0, "age"], Any[0, "sex"], Any[0, "major"], Any[0, "advisor"], Any[0, "city code"], Any[1, "student id"], Any[1, "registration date"], Any[1, "election cycle"], Any[1, "president vote"], Any[1, "vice president vote"], Any[1, "secretary vote"], Any[1, "treasurer vote"], Any[1, "class president vote"], Any[1, "class senator vote"]]), names(dirty_table)))
+foreign_keys = ["class senator vote", "class president vote", "treasurer vote", "secretary vote", "vice president vote", "president vote", "student id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "last name"], Any[0, "first name"], Any[0, "age"], Any[0, "sex"], Any[0, "major"], Any[0, "advisor"], Any[0, "city code"], Any[1, "registration date"], Any[1, "election cycle"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -37,21 +59,10 @@ PClean.@model Voter2Model begin
         city_code ~ ChooseUniformly(possibilities[:city_code])
     end
 
-    @class Voting_Record begin
-        student_id ~ Unmodeled()
-        registration_date ~ ChooseUniformly(possibilities[:registration_date])
-        election_cycle ~ ChooseUniformly(possibilities[:election_cycle])
-        president_vote ~ ChooseUniformly(possibilities[:president_vote])
-        vice_president_vote ~ ChooseUniformly(possibilities[:vice_president_vote])
-        secretary_vote ~ ChooseUniformly(possibilities[:secretary_vote])
-        treasurer_vote ~ ChooseUniformly(possibilities[:treasurer_vote])
-        class_president_vote ~ ChooseUniformly(possibilities[:class_president_vote])
-        class_senator_vote ~ ChooseUniformly(possibilities[:class_senator_vote])
-    end
-
     @class Obs begin
         student ~ Student
-        voting_Record ~ Voting_Record
+        registration_date ~ ChooseUniformly(possibilities[:registration_date])
+        election_cycle ~ ChooseUniformly(possibilities[:election_cycle])
     end
 end
 
@@ -64,8 +75,8 @@ query = @query Voter2Model.Obs [
     student_major student.major
     student_advisor student.advisor
     student_city_code student.city_code
-    voting_record_registration_date voting_Record.registration_date
-    voting_record_election_cycle voting_Record.election_cycle
+    voting_record_registration_date registration_date
+    voting_record_election_cycle election_cycle
 ]
 
 
@@ -76,4 +87,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

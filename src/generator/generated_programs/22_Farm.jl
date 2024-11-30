@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("city_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("city_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "city id"], Any[0, "official name"], Any[0, "status"], Any[0, "area km 2"], Any[0, "population"], Any[0, "census ranking"], Any[1, "farm id"], Any[1, "year"], Any[1, "total horses"], Any[1, "working horses"], Any[1, "total cattle"], Any[1, "oxen"], Any[1, "bulls"], Any[1, "cows"], Any[1, "pigs"], Any[1, "sheep and goats"], Any[2, "competition id"], Any[2, "year"], Any[2, "theme"], Any[2, "host city id"], Any[2, "hosts"], Any[3, "competition id"], Any[3, "farm id"], Any[3, "rank"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "city id"], Any[0, "official name"], Any[0, "status"], Any[0, "area km 2"], Any[0, "population"], Any[0, "census ranking"], Any[1, "farm id"], Any[1, "year"], Any[1, "total horses"], Any[1, "working horses"], Any[1, "total cattle"], Any[1, "oxen"], Any[1, "bulls"], Any[1, "cows"], Any[1, "pigs"], Any[1, "sheep and goats"], Any[2, "competition id"], Any[2, "year"], Any[2, "theme"], Any[2, "host city id"], Any[2, "hosts"], Any[3, "competition id"], Any[3, "farm id"], Any[3, "rank"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "city id"], Any[0, "official name"], Any[0, "status"], Any[0, "area km 2"], Any[0, "population"], Any[0, "census ranking"], Any[1, "farm id"], Any[1, "year"], Any[1, "total horses"], Any[1, "working horses"], Any[1, "total cattle"], Any[1, "oxen"], Any[1, "bulls"], Any[1, "cows"], Any[1, "pigs"], Any[1, "sheep and goats"], Any[2, "competition id"], Any[2, "year"], Any[2, "theme"], Any[2, "host city id"], Any[2, "hosts"], Any[3, "competition id"], Any[3, "farm id"], Any[3, "rank"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "city id"], Any[0, "official name"], Any[0, "status"], Any[0, "area km 2"], Any[0, "population"], Any[0, "census ranking"], Any[1, "farm id"], Any[1, "year"], Any[1, "total horses"], Any[1, "working horses"], Any[1, "total cattle"], Any[1, "oxen"], Any[1, "bulls"], Any[1, "cows"], Any[1, "pigs"], Any[1, "sheep and goats"], Any[2, "competition id"], Any[2, "year"], Any[2, "theme"], Any[2, "host city id"], Any[2, "hosts"], Any[3, "competition id"], Any[3, "farm id"], Any[3, "rank"]]), names(dirty_table)))
+foreign_keys = ["host city id", "farm id", "competition id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "city id"], Any[0, "official name"], Any[0, "status"], Any[0, "area km 2"], Any[0, "population"], Any[0, "census ranking"], Any[1, "year"], Any[1, "total horses"], Any[1, "working horses"], Any[1, "total cattle"], Any[1, "oxen"], Any[1, "bulls"], Any[1, "cows"], Any[1, "pigs"], Any[1, "sheep and goats"], Any[2, "year"], Any[2, "theme"], Any[2, "hosts"], Any[3, "rank"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -48,25 +70,14 @@ PClean.@model FarmModel begin
         sheep_and_goats ~ ChooseUniformly(possibilities[:sheep_and_goats])
     end
 
-    @class Farm_Competition begin
-        competition_id ~ Unmodeled()
-        year ~ ChooseUniformly(possibilities[:year])
-        theme ~ ChooseUniformly(possibilities[:theme])
-        host_city_id ~ ChooseUniformly(possibilities[:host_city_id])
-        hosts ~ ChooseUniformly(possibilities[:hosts])
-    end
-
-    @class Competition_Record begin
-        competition_id ~ Unmodeled()
-        farm_id ~ ChooseUniformly(possibilities[:farm_id])
-        rank ~ ChooseUniformly(possibilities[:rank])
-    end
-
     @class Obs begin
         city ~ City
         farm ~ Farm
-        farm_Competition ~ Farm_Competition
-        competition_Record ~ Competition_Record
+        competition_id ~ Unmodeled()
+        year ~ ChooseUniformly(possibilities[:year])
+        theme ~ ChooseUniformly(possibilities[:theme])
+        hosts ~ ChooseUniformly(possibilities[:hosts])
+        rank ~ ChooseUniformly(possibilities[:rank])
     end
 end
 
@@ -87,11 +98,11 @@ query = @query FarmModel.Obs [
     farm_cows farm.cows
     farm_pigs farm.pigs
     farm_sheep_and_goats farm.sheep_and_goats
-    farm_competition_competition_id farm_Competition.competition_id
-    farm_competition_year farm_Competition.year
-    farm_competition_theme farm_Competition.theme
-    farm_competition_hosts farm_Competition.hosts
-    competition_record_rank competition_Record.rank
+    farm_competition_competition_id competition_id
+    farm_competition_year year
+    farm_competition_theme theme
+    farm_competition_hosts hosts
+    competition_record_rank rank
 ]
 
 
@@ -102,4 +113,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

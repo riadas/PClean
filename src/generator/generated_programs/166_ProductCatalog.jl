@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("attribute definitions_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("attribute definitions_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "attribute id"], Any[0, "attribute name"], Any[0, "attribute data type"], Any[1, "catalog id"], Any[1, "catalog name"], Any[1, "catalog publisher"], Any[1, "date of publication"], Any[1, "date of latest revision"], Any[2, "catalog level number"], Any[2, "catalog id"], Any[2, "catalog level name"], Any[3, "catalog entry id"], Any[3, "catalog level number"], Any[3, "parent entry id"], Any[3, "previous entry id"], Any[3, "next entry id"], Any[3, "catalog entry name"], Any[3, "product stock number"], Any[3, "price in dollars"], Any[3, "price in euros"], Any[3, "price in pounds"], Any[3, "capacity"], Any[3, "length"], Any[3, "height"], Any[3, "width"], Any[4, "catalog entry id"], Any[4, "catalog level number"], Any[4, "attribute id"], Any[4, "attribute value"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "attribute id"], Any[0, "attribute name"], Any[0, "attribute data type"], Any[1, "catalog id"], Any[1, "catalog name"], Any[1, "catalog publisher"], Any[1, "date of publication"], Any[1, "date of latest revision"], Any[2, "catalog level number"], Any[2, "catalog id"], Any[2, "catalog level name"], Any[3, "catalog entry id"], Any[3, "catalog level number"], Any[3, "parent entry id"], Any[3, "previous entry id"], Any[3, "next entry id"], Any[3, "catalog entry name"], Any[3, "product stock number"], Any[3, "price in dollars"], Any[3, "price in euros"], Any[3, "price in pounds"], Any[3, "capacity"], Any[3, "length"], Any[3, "height"], Any[3, "width"], Any[4, "catalog entry id"], Any[4, "catalog level number"], Any[4, "attribute id"], Any[4, "attribute value"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "attribute id"], Any[0, "attribute name"], Any[0, "attribute data type"], Any[1, "catalog id"], Any[1, "catalog name"], Any[1, "catalog publisher"], Any[1, "date of publication"], Any[1, "date of latest revision"], Any[2, "catalog level number"], Any[2, "catalog id"], Any[2, "catalog level name"], Any[3, "catalog entry id"], Any[3, "catalog level number"], Any[3, "parent entry id"], Any[3, "previous entry id"], Any[3, "next entry id"], Any[3, "catalog entry name"], Any[3, "product stock number"], Any[3, "price in dollars"], Any[3, "price in euros"], Any[3, "price in pounds"], Any[3, "capacity"], Any[3, "length"], Any[3, "height"], Any[3, "width"], Any[4, "catalog entry id"], Any[4, "catalog level number"], Any[4, "attribute id"], Any[4, "attribute value"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "attribute id"], Any[0, "attribute name"], Any[0, "attribute data type"], Any[1, "catalog id"], Any[1, "catalog name"], Any[1, "catalog publisher"], Any[1, "date of publication"], Any[1, "date of latest revision"], Any[2, "catalog level number"], Any[2, "catalog id"], Any[2, "catalog level name"], Any[3, "catalog entry id"], Any[3, "catalog level number"], Any[3, "parent entry id"], Any[3, "previous entry id"], Any[3, "next entry id"], Any[3, "catalog entry name"], Any[3, "product stock number"], Any[3, "price in dollars"], Any[3, "price in euros"], Any[3, "price in pounds"], Any[3, "capacity"], Any[3, "length"], Any[3, "height"], Any[3, "width"], Any[4, "catalog entry id"], Any[4, "catalog level number"], Any[4, "attribute id"], Any[4, "attribute value"]]), names(dirty_table)))
+foreign_keys = ["catalog id", "catalog level number", "catalog level number", "catalog entry id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "attribute id"], Any[0, "attribute name"], Any[0, "attribute data type"], Any[1, "catalog name"], Any[1, "catalog publisher"], Any[1, "date of publication"], Any[1, "date of latest revision"], Any[2, "catalog level name"], Any[3, "parent entry id"], Any[3, "previous entry id"], Any[3, "next entry id"], Any[3, "catalog entry name"], Any[3, "product stock number"], Any[3, "price in dollars"], Any[3, "price in euros"], Any[3, "price in pounds"], Any[3, "capacity"], Any[3, "length"], Any[3, "height"], Any[3, "width"], Any[4, "attribute id"], Any[4, "attribute value"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -40,15 +62,12 @@ PClean.@model ProductCatalogModel begin
         date_of_latest_revision ~ TimePrior(possibilities[:date_of_latest_revision])
     end
 
-    @class Catalog_Structure begin
+    @class Obs begin
+        attribute_Definitions ~ Attribute_Definitions
+        catalogs ~ Catalogs
         catalog_level_number ~ ChooseUniformly(possibilities[:catalog_level_number])
-        catalog_id ~ ChooseUniformly(possibilities[:catalog_id])
         catalog_level_name ~ ChooseUniformly(possibilities[:catalog_level_name])
-    end
-
-    @class Catalog_Contents begin
         catalog_entry_id ~ Unmodeled()
-        catalog_level_number ~ ChooseUniformly(possibilities[:catalog_level_number])
         parent_entry_id ~ ChooseUniformly(possibilities[:parent_entry_id])
         previous_entry_id ~ ChooseUniformly(possibilities[:previous_entry_id])
         next_entry_id ~ ChooseUniformly(possibilities[:next_entry_id])
@@ -61,21 +80,8 @@ PClean.@model ProductCatalogModel begin
         length ~ ChooseUniformly(possibilities[:length])
         height ~ ChooseUniformly(possibilities[:height])
         width ~ ChooseUniformly(possibilities[:width])
-    end
-
-    @class Catalog_Contents_Additional_Attributes begin
-        catalog_entry_id ~ Unmodeled()
-        catalog_level_number ~ ChooseUniformly(possibilities[:catalog_level_number])
         attribute_id ~ ChooseUniformly(possibilities[:attribute_id])
         attribute_value ~ ChooseUniformly(possibilities[:attribute_value])
-    end
-
-    @class Obs begin
-        attribute_Definitions ~ Attribute_Definitions
-        catalogs ~ Catalogs
-        catalog_Structure ~ Catalog_Structure
-        catalog_Contents ~ Catalog_Contents
-        catalog_Contents_Additional_Attributes ~ Catalog_Contents_Additional_Attributes
     end
 end
 
@@ -88,23 +94,23 @@ query = @query ProductCatalogModel.Obs [
     catalogs_catalog_publisher catalogs.catalog_publisher
     catalogs_date_of_publication catalogs.date_of_publication
     catalogs_date_of_latest_revision catalogs.date_of_latest_revision
-    catalog_structure_catalog_level_number catalog_Structure.catalog_level_number
-    catalog_structure_catalog_level_name catalog_Structure.catalog_level_name
-    catalog_contents_catalog_entry_id catalog_Contents.catalog_entry_id
-    catalog_contents_parent_entry_id catalog_Contents.parent_entry_id
-    catalog_contents_previous_entry_id catalog_Contents.previous_entry_id
-    catalog_contents_next_entry_id catalog_Contents.next_entry_id
-    catalog_contents_catalog_entry_name catalog_Contents.catalog_entry_name
-    catalog_contents_product_stock_number catalog_Contents.product_stock_number
-    catalog_contents_price_in_dollars catalog_Contents.price_in_dollars
-    catalog_contents_price_in_euros catalog_Contents.price_in_euros
-    catalog_contents_price_in_pounds catalog_Contents.price_in_pounds
-    catalog_contents_capacity catalog_Contents.capacity
-    catalog_contents_length catalog_Contents.length
-    catalog_contents_height catalog_Contents.height
-    catalog_contents_width catalog_Contents.width
-    catalog_contents_additional_attributes_attribute_id catalog_Contents_Additional_Attributes.attribute_id
-    catalog_contents_additional_attributes_attribute_value catalog_Contents_Additional_Attributes.attribute_value
+    catalog_structure_catalog_level_number catalog_level_number
+    catalog_structure_catalog_level_name catalog_level_name
+    catalog_contents_catalog_entry_id catalog_entry_id
+    catalog_contents_parent_entry_id parent_entry_id
+    catalog_contents_previous_entry_id previous_entry_id
+    catalog_contents_next_entry_id next_entry_id
+    catalog_contents_catalog_entry_name catalog_entry_name
+    catalog_contents_product_stock_number product_stock_number
+    catalog_contents_price_in_dollars price_in_dollars
+    catalog_contents_price_in_euros price_in_euros
+    catalog_contents_price_in_pounds price_in_pounds
+    catalog_contents_capacity capacity
+    catalog_contents_length length
+    catalog_contents_height height
+    catalog_contents_width width
+    catalog_contents_additional_attributes_attribute_id attribute_id
+    catalog_contents_additional_attributes_attribute_value attribute_value
 ]
 
 
@@ -115,4 +121,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

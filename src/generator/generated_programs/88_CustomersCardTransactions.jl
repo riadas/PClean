@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("accounts_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("accounts_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "account id"], Any[0, "customer id"], Any[0, "account name"], Any[0, "other account details"], Any[1, "customer id"], Any[1, "customer first name"], Any[1, "customer last name"], Any[1, "customer address"], Any[1, "customer phone"], Any[1, "customer email"], Any[1, "other customer details"], Any[2, "card id"], Any[2, "customer id"], Any[2, "card type code"], Any[2, "card number"], Any[2, "date valid from"], Any[2, "date valid to"], Any[2, "other card details"], Any[3, "transaction id"], Any[3, "previous transaction id"], Any[3, "account id"], Any[3, "card id"], Any[3, "transaction type"], Any[3, "transaction date"], Any[3, "transaction amount"], Any[3, "transaction comment"], Any[3, "other transaction details"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "account id"], Any[0, "customer id"], Any[0, "account name"], Any[0, "other account details"], Any[1, "customer id"], Any[1, "customer first name"], Any[1, "customer last name"], Any[1, "customer address"], Any[1, "customer phone"], Any[1, "customer email"], Any[1, "other customer details"], Any[2, "card id"], Any[2, "customer id"], Any[2, "card type code"], Any[2, "card number"], Any[2, "date valid from"], Any[2, "date valid to"], Any[2, "other card details"], Any[3, "transaction id"], Any[3, "previous transaction id"], Any[3, "account id"], Any[3, "card id"], Any[3, "transaction type"], Any[3, "transaction date"], Any[3, "transaction amount"], Any[3, "transaction comment"], Any[3, "other transaction details"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "account id"], Any[0, "customer id"], Any[0, "account name"], Any[0, "other account details"], Any[1, "customer id"], Any[1, "customer first name"], Any[1, "customer last name"], Any[1, "customer address"], Any[1, "customer phone"], Any[1, "customer email"], Any[1, "other customer details"], Any[2, "card id"], Any[2, "customer id"], Any[2, "card type code"], Any[2, "card number"], Any[2, "date valid from"], Any[2, "date valid to"], Any[2, "other card details"], Any[3, "transaction id"], Any[3, "previous transaction id"], Any[3, "account id"], Any[3, "card id"], Any[3, "transaction type"], Any[3, "transaction date"], Any[3, "transaction amount"], Any[3, "transaction comment"], Any[3, "other transaction details"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "account id"], Any[0, "customer id"], Any[0, "account name"], Any[0, "other account details"], Any[1, "customer id"], Any[1, "customer first name"], Any[1, "customer last name"], Any[1, "customer address"], Any[1, "customer phone"], Any[1, "customer email"], Any[1, "other customer details"], Any[2, "card id"], Any[2, "customer id"], Any[2, "card type code"], Any[2, "card number"], Any[2, "date valid from"], Any[2, "date valid to"], Any[2, "other card details"], Any[3, "transaction id"], Any[3, "previous transaction id"], Any[3, "account id"], Any[3, "card id"], Any[3, "transaction type"], Any[3, "transaction date"], Any[3, "transaction amount"], Any[3, "transaction comment"], Any[3, "other transaction details"]]), names(dirty_table)))
+foreign_keys = ["account id", "card id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "customer id"], Any[0, "account name"], Any[0, "other account details"], Any[1, "customer id"], Any[1, "customer first name"], Any[1, "customer last name"], Any[1, "customer address"], Any[1, "customer phone"], Any[1, "customer email"], Any[1, "other customer details"], Any[2, "customer id"], Any[2, "card type code"], Any[2, "card number"], Any[2, "date valid from"], Any[2, "date valid to"], Any[2, "other card details"], Any[3, "transaction id"], Any[3, "previous transaction id"], Any[3, "transaction type"], Any[3, "transaction date"], Any[3, "transaction amount"], Any[3, "transaction comment"], Any[3, "other transaction details"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -53,23 +75,17 @@ PClean.@model CustomersCardTransactionsModel begin
         other_card_details ~ ChooseUniformly(possibilities[:other_card_details])
     end
 
-    @class Financial_Transactions begin
+    @class Obs begin
+        accounts ~ Accounts
+        customers ~ Customers
+        customers_Cards ~ Customers_Cards
         transaction_id ~ Unmodeled()
         previous_transaction_id ~ ChooseUniformly(possibilities[:previous_transaction_id])
-        account_id ~ ChooseUniformly(possibilities[:account_id])
-        card_id ~ ChooseUniformly(possibilities[:card_id])
         transaction_type ~ ChooseUniformly(possibilities[:transaction_type])
         transaction_date ~ TimePrior(possibilities[:transaction_date])
         transaction_amount ~ ChooseUniformly(possibilities[:transaction_amount])
         transaction_comment ~ ChooseUniformly(possibilities[:transaction_comment])
         other_transaction_details ~ ChooseUniformly(possibilities[:other_transaction_details])
-    end
-
-    @class Obs begin
-        accounts ~ Accounts
-        customers ~ Customers
-        customers_Cards ~ Customers_Cards
-        financial_Transactions ~ Financial_Transactions
     end
 end
 
@@ -92,13 +108,13 @@ query = @query CustomersCardTransactionsModel.Obs [
     customers_cards_date_valid_from customers_Cards.date_valid_from
     customers_cards_date_valid_to customers_Cards.date_valid_to
     customers_cards_other_card_details customers_Cards.other_card_details
-    financial_transactions_transaction_id financial_Transactions.transaction_id
-    financial_transactions_previous_transaction_id financial_Transactions.previous_transaction_id
-    financial_transactions_transaction_type financial_Transactions.transaction_type
-    financial_transactions_transaction_date financial_Transactions.transaction_date
-    financial_transactions_transaction_amount financial_Transactions.transaction_amount
-    financial_transactions_transaction_comment financial_Transactions.transaction_comment
-    financial_transactions_other_transaction_details financial_Transactions.other_transaction_details
+    financial_transactions_transaction_id transaction_id
+    financial_transactions_previous_transaction_id previous_transaction_id
+    financial_transactions_transaction_type transaction_type
+    financial_transactions_transaction_date transaction_date
+    financial_transactions_transaction_amount transaction_amount
+    financial_transactions_transaction_comment transaction_comment
+    financial_transactions_other_transaction_details other_transaction_details
 ]
 
 
@@ -109,4 +125,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

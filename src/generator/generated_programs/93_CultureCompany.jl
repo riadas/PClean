@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("book club_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("book club_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "book club id"], Any[0, "year"], Any[0, "author or editor"], Any[0, "book title"], Any[0, "publisher"], Any[0, "category"], Any[0, "result"], Any[1, "movie id"], Any[1, "title"], Any[1, "year"], Any[1, "director"], Any[1, "budget million"], Any[1, "gross worldwide"], Any[2, "company name"], Any[2, "type"], Any[2, "incorporated in"], Any[2, "group equity shareholding"], Any[2, "book club id"], Any[2, "movie id"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "book club id"], Any[0, "year"], Any[0, "author or editor"], Any[0, "book title"], Any[0, "publisher"], Any[0, "category"], Any[0, "result"], Any[1, "movie id"], Any[1, "title"], Any[1, "year"], Any[1, "director"], Any[1, "budget million"], Any[1, "gross worldwide"], Any[2, "company name"], Any[2, "type"], Any[2, "incorporated in"], Any[2, "group equity shareholding"], Any[2, "book club id"], Any[2, "movie id"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "book club id"], Any[0, "year"], Any[0, "author or editor"], Any[0, "book title"], Any[0, "publisher"], Any[0, "category"], Any[0, "result"], Any[1, "movie id"], Any[1, "title"], Any[1, "year"], Any[1, "director"], Any[1, "budget million"], Any[1, "gross worldwide"], Any[2, "company name"], Any[2, "type"], Any[2, "incorporated in"], Any[2, "group equity shareholding"], Any[2, "book club id"], Any[2, "movie id"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "book club id"], Any[0, "year"], Any[0, "author or editor"], Any[0, "book title"], Any[0, "publisher"], Any[0, "category"], Any[0, "result"], Any[1, "movie id"], Any[1, "title"], Any[1, "year"], Any[1, "director"], Any[1, "budget million"], Any[1, "gross worldwide"], Any[2, "company name"], Any[2, "type"], Any[2, "incorporated in"], Any[2, "group equity shareholding"], Any[2, "book club id"], Any[2, "movie id"]]), names(dirty_table)))
+foreign_keys = ["movie id", "book club id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "year"], Any[0, "author or editor"], Any[0, "book title"], Any[0, "publisher"], Any[0, "category"], Any[0, "result"], Any[1, "title"], Any[1, "year"], Any[1, "director"], Any[1, "budget million"], Any[1, "gross worldwide"], Any[2, "company name"], Any[2, "type"], Any[2, "incorporated in"], Any[2, "group equity shareholding"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -45,19 +67,13 @@ PClean.@model CultureCompanyModel begin
         gross_worldwide ~ ChooseUniformly(possibilities[:gross_worldwide])
     end
 
-    @class Culture_Company begin
+    @class Obs begin
+        book_Club ~ Book_Club
+        movie ~ Movie
         company_name ~ ChooseUniformly(possibilities[:company_name])
         type ~ ChooseUniformly(possibilities[:type])
         incorporated_in ~ ChooseUniformly(possibilities[:incorporated_in])
         group_equity_shareholding ~ ChooseUniformly(possibilities[:group_equity_shareholding])
-        book_club_id ~ ChooseUniformly(possibilities[:book_club_id])
-        movie_id ~ ChooseUniformly(possibilities[:movie_id])
-    end
-
-    @class Obs begin
-        book_Club ~ Book_Club
-        movie ~ Movie
-        culture_Company ~ Culture_Company
     end
 end
 
@@ -75,10 +91,10 @@ query = @query CultureCompanyModel.Obs [
     movie_director movie.director
     movie_budget_million movie.budget_million
     movie_gross_worldwide movie.gross_worldwide
-    culture_company_company_name culture_Company.company_name
-    culture_company_type culture_Company.type
-    culture_company_incorporated_in culture_Company.incorporated_in
-    culture_company_group_equity_shareholding culture_Company.group_equity_shareholding
+    culture_company_company_name company_name
+    culture_company_type type
+    culture_company_incorporated_in incorporated_in
+    culture_company_group_equity_shareholding group_equity_shareholding
 ]
 
 
@@ -89,4 +105,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

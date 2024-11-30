@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("film_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("film_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "film id"], Any[0, "title"], Any[0, "studio"], Any[0, "director"], Any[0, "gross in dollar"], Any[1, "market id"], Any[1, "country"], Any[1, "number cities"], Any[2, "estimation id"], Any[2, "low estimate"], Any[2, "high estimate"], Any[2, "film id"], Any[2, "type"], Any[2, "market id"], Any[2, "year"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "film id"], Any[0, "title"], Any[0, "studio"], Any[0, "director"], Any[0, "gross in dollar"], Any[1, "market id"], Any[1, "country"], Any[1, "number cities"], Any[2, "estimation id"], Any[2, "low estimate"], Any[2, "high estimate"], Any[2, "film id"], Any[2, "type"], Any[2, "market id"], Any[2, "year"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "film id"], Any[0, "title"], Any[0, "studio"], Any[0, "director"], Any[0, "gross in dollar"], Any[1, "market id"], Any[1, "country"], Any[1, "number cities"], Any[2, "estimation id"], Any[2, "low estimate"], Any[2, "high estimate"], Any[2, "film id"], Any[2, "type"], Any[2, "market id"], Any[2, "year"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "film id"], Any[0, "title"], Any[0, "studio"], Any[0, "director"], Any[0, "gross in dollar"], Any[1, "market id"], Any[1, "country"], Any[1, "number cities"], Any[2, "estimation id"], Any[2, "low estimate"], Any[2, "high estimate"], Any[2, "film id"], Any[2, "type"], Any[2, "market id"], Any[2, "year"]]), names(dirty_table)))
+foreign_keys = ["market id", "film id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "title"], Any[0, "studio"], Any[0, "director"], Any[0, "gross in dollar"], Any[1, "country"], Any[1, "number cities"], Any[2, "estimation id"], Any[2, "low estimate"], Any[2, "high estimate"], Any[2, "type"], Any[2, "year"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -40,20 +62,14 @@ PClean.@model FilmRankModel begin
         number_cities ~ ChooseUniformly(possibilities[:number_cities])
     end
 
-    @class Film_Market_Estimation begin
-        estimation_id ~ Unmodeled()
-        low_estimate ~ ChooseUniformly(possibilities[:low_estimate])
-        high_estimate ~ ChooseUniformly(possibilities[:high_estimate])
-        film_id ~ ChooseUniformly(possibilities[:film_id])
-        type ~ ChooseUniformly(possibilities[:type])
-        market_id ~ ChooseUniformly(possibilities[:market_id])
-        year ~ ChooseUniformly(possibilities[:year])
-    end
-
     @class Obs begin
         film ~ Film
         market ~ Market
-        film_Market_Estimation ~ Film_Market_Estimation
+        estimation_id ~ Unmodeled()
+        low_estimate ~ ChooseUniformly(possibilities[:low_estimate])
+        high_estimate ~ ChooseUniformly(possibilities[:high_estimate])
+        type ~ ChooseUniformly(possibilities[:type])
+        year ~ ChooseUniformly(possibilities[:year])
     end
 end
 
@@ -66,11 +82,11 @@ query = @query FilmRankModel.Obs [
     market_id market.market_id
     market_country market.country
     market_number_cities market.number_cities
-    film_market_estimation_estimation_id film_Market_Estimation.estimation_id
-    film_market_estimation_low_estimate film_Market_Estimation.low_estimate
-    film_market_estimation_high_estimate film_Market_Estimation.high_estimate
-    film_market_estimation_type film_Market_Estimation.type
-    film_market_estimation_year film_Market_Estimation.year
+    film_market_estimation_estimation_id estimation_id
+    film_market_estimation_low_estimate low_estimate
+    film_market_estimation_high_estimate high_estimate
+    film_market_estimation_type type
+    film_market_estimation_year year
 ]
 
 
@@ -81,4 +97,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

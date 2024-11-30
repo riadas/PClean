@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("station_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("station_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "latitude"], Any[0, "longitude"], Any[0, "dock count"], Any[0, "city"], Any[0, "installation date"], Any[1, "station id"], Any[1, "bikes available"], Any[1, "docks available"], Any[1, "time"], Any[2, "id"], Any[2, "duration"], Any[2, "start date"], Any[2, "start station name"], Any[2, "start station id"], Any[2, "end date"], Any[2, "end station name"], Any[2, "end station id"], Any[2, "bike id"], Any[2, "subscription type"], Any[2, "zip code"], Any[3, "date"], Any[3, "max temperature f"], Any[3, "mean temperature f"], Any[3, "min temperature f"], Any[3, "max dew point f"], Any[3, "mean dew point f"], Any[3, "min dew point f"], Any[3, "max humidity"], Any[3, "mean humidity"], Any[3, "min humidity"], Any[3, "max sea level pressure inches"], Any[3, "mean sea level pressure inches"], Any[3, "min sea level pressure inches"], Any[3, "max visibility miles"], Any[3, "mean visibility miles"], Any[3, "min visibility miles"], Any[3, "max wind speed mph"], Any[3, "mean wind speed mph"], Any[3, "max gust speed mph"], Any[3, "precipitation inches"], Any[3, "cloud cover"], Any[3, "events"], Any[3, "wind dir degrees"], Any[3, "zip code"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "latitude"], Any[0, "longitude"], Any[0, "dock count"], Any[0, "city"], Any[0, "installation date"], Any[1, "station id"], Any[1, "bikes available"], Any[1, "docks available"], Any[1, "time"], Any[2, "id"], Any[2, "duration"], Any[2, "start date"], Any[2, "start station name"], Any[2, "start station id"], Any[2, "end date"], Any[2, "end station name"], Any[2, "end station id"], Any[2, "bike id"], Any[2, "subscription type"], Any[2, "zip code"], Any[3, "date"], Any[3, "max temperature f"], Any[3, "mean temperature f"], Any[3, "min temperature f"], Any[3, "max dew point f"], Any[3, "mean dew point f"], Any[3, "min dew point f"], Any[3, "max humidity"], Any[3, "mean humidity"], Any[3, "min humidity"], Any[3, "max sea level pressure inches"], Any[3, "mean sea level pressure inches"], Any[3, "min sea level pressure inches"], Any[3, "max visibility miles"], Any[3, "mean visibility miles"], Any[3, "min visibility miles"], Any[3, "max wind speed mph"], Any[3, "mean wind speed mph"], Any[3, "max gust speed mph"], Any[3, "precipitation inches"], Any[3, "cloud cover"], Any[3, "events"], Any[3, "wind dir degrees"], Any[3, "zip code"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "latitude"], Any[0, "longitude"], Any[0, "dock count"], Any[0, "city"], Any[0, "installation date"], Any[1, "station id"], Any[1, "bikes available"], Any[1, "docks available"], Any[1, "time"], Any[2, "id"], Any[2, "duration"], Any[2, "start date"], Any[2, "start station name"], Any[2, "start station id"], Any[2, "end date"], Any[2, "end station name"], Any[2, "end station id"], Any[2, "bike id"], Any[2, "subscription type"], Any[2, "zip code"], Any[3, "date"], Any[3, "max temperature f"], Any[3, "mean temperature f"], Any[3, "min temperature f"], Any[3, "max dew point f"], Any[3, "mean dew point f"], Any[3, "min dew point f"], Any[3, "max humidity"], Any[3, "mean humidity"], Any[3, "min humidity"], Any[3, "max sea level pressure inches"], Any[3, "mean sea level pressure inches"], Any[3, "min sea level pressure inches"], Any[3, "max visibility miles"], Any[3, "mean visibility miles"], Any[3, "min visibility miles"], Any[3, "max wind speed mph"], Any[3, "mean wind speed mph"], Any[3, "max gust speed mph"], Any[3, "precipitation inches"], Any[3, "cloud cover"], Any[3, "events"], Any[3, "wind dir degrees"], Any[3, "zip code"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "latitude"], Any[0, "longitude"], Any[0, "dock count"], Any[0, "city"], Any[0, "installation date"], Any[1, "station id"], Any[1, "bikes available"], Any[1, "docks available"], Any[1, "time"], Any[2, "id"], Any[2, "duration"], Any[2, "start date"], Any[2, "start station name"], Any[2, "start station id"], Any[2, "end date"], Any[2, "end station name"], Any[2, "end station id"], Any[2, "bike id"], Any[2, "subscription type"], Any[2, "zip code"], Any[3, "date"], Any[3, "max temperature f"], Any[3, "mean temperature f"], Any[3, "min temperature f"], Any[3, "max dew point f"], Any[3, "mean dew point f"], Any[3, "min dew point f"], Any[3, "max humidity"], Any[3, "mean humidity"], Any[3, "min humidity"], Any[3, "max sea level pressure inches"], Any[3, "mean sea level pressure inches"], Any[3, "min sea level pressure inches"], Any[3, "max visibility miles"], Any[3, "mean visibility miles"], Any[3, "min visibility miles"], Any[3, "max wind speed mph"], Any[3, "mean wind speed mph"], Any[3, "max gust speed mph"], Any[3, "precipitation inches"], Any[3, "cloud cover"], Any[3, "events"], Any[3, "wind dir degrees"], Any[3, "zip code"]]), names(dirty_table)))
+foreign_keys = ["station id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "latitude"], Any[0, "longitude"], Any[0, "dock count"], Any[0, "city"], Any[0, "installation date"], Any[1, "bikes available"], Any[1, "docks available"], Any[1, "time"], Any[2, "id"], Any[2, "duration"], Any[2, "start date"], Any[2, "start station name"], Any[2, "start station id"], Any[2, "end date"], Any[2, "end station name"], Any[2, "end station id"], Any[2, "bike id"], Any[2, "subscription type"], Any[2, "zip code"], Any[3, "date"], Any[3, "max temperature f"], Any[3, "mean temperature f"], Any[3, "min temperature f"], Any[3, "max dew point f"], Any[3, "mean dew point f"], Any[3, "min dew point f"], Any[3, "max humidity"], Any[3, "mean humidity"], Any[3, "min humidity"], Any[3, "max sea level pressure inches"], Any[3, "mean sea level pressure inches"], Any[3, "min sea level pressure inches"], Any[3, "max visibility miles"], Any[3, "mean visibility miles"], Any[3, "min visibility miles"], Any[3, "max wind speed mph"], Any[3, "mean wind speed mph"], Any[3, "max gust speed mph"], Any[3, "precipitation inches"], Any[3, "cloud cover"], Any[3, "events"], Any[3, "wind dir degrees"], Any[3, "zip code"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -34,13 +56,6 @@ PClean.@model Bike1Model begin
         dock_count ~ ChooseUniformly(possibilities[:dock_count])
         city ~ ChooseUniformly(possibilities[:city])
         installation_date ~ ChooseUniformly(possibilities[:installation_date])
-    end
-
-    @class Status begin
-        station_id ~ Unmodeled()
-        bikes_available ~ ChooseUniformly(possibilities[:bikes_available])
-        docks_available ~ ChooseUniformly(possibilities[:docks_available])
-        time ~ ChooseUniformly(possibilities[:time])
     end
 
     @class Trip begin
@@ -86,9 +101,11 @@ PClean.@model Bike1Model begin
 
     @class Obs begin
         station ~ Station
-        status ~ Status
         trip ~ Trip
         weather ~ Weather
+        bikes_available ~ ChooseUniformly(possibilities[:bikes_available])
+        docks_available ~ ChooseUniformly(possibilities[:docks_available])
+        time ~ ChooseUniformly(possibilities[:time])
     end
 end
 
@@ -100,9 +117,9 @@ query = @query Bike1Model.Obs [
     station_dock_count station.dock_count
     station_city station.city
     station_installation_date station.installation_date
-    status_bikes_available status.bikes_available
-    status_docks_available status.docks_available
-    status_time status.time
+    status_bikes_available bikes_available
+    status_docks_available docks_available
+    status_time time
     trip_id trip.id
     trip_duration trip.duration
     trip_start_date trip.start_date
@@ -148,4 +165,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

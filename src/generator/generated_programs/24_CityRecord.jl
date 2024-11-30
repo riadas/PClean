@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("city_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("city_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "city id"], Any[0, "city"], Any[0, "hanzi"], Any[0, "hanyu pinyin"], Any[0, "regional population"], Any[0, "gdp"], Any[1, "match id"], Any[1, "date"], Any[1, "venue"], Any[1, "score"], Any[1, "result"], Any[1, "competition"], Any[2, "city id"], Any[2, "jan"], Any[2, "feb"], Any[2, "mar"], Any[2, "apr"], Any[2, "jun"], Any[2, "jul"], Any[2, "aug"], Any[2, "sep"], Any[2, "oct"], Any[2, "nov"], Any[2, "dec"], Any[3, "year"], Any[3, "match id"], Any[3, "host city"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "city id"], Any[0, "city"], Any[0, "hanzi"], Any[0, "hanyu pinyin"], Any[0, "regional population"], Any[0, "gdp"], Any[1, "match id"], Any[1, "date"], Any[1, "venue"], Any[1, "score"], Any[1, "result"], Any[1, "competition"], Any[2, "city id"], Any[2, "jan"], Any[2, "feb"], Any[2, "mar"], Any[2, "apr"], Any[2, "jun"], Any[2, "jul"], Any[2, "aug"], Any[2, "sep"], Any[2, "oct"], Any[2, "nov"], Any[2, "dec"], Any[3, "year"], Any[3, "match id"], Any[3, "host city"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "city id"], Any[0, "city"], Any[0, "hanzi"], Any[0, "hanyu pinyin"], Any[0, "regional population"], Any[0, "gdp"], Any[1, "match id"], Any[1, "date"], Any[1, "venue"], Any[1, "score"], Any[1, "result"], Any[1, "competition"], Any[2, "city id"], Any[2, "jan"], Any[2, "feb"], Any[2, "mar"], Any[2, "apr"], Any[2, "jun"], Any[2, "jul"], Any[2, "aug"], Any[2, "sep"], Any[2, "oct"], Any[2, "nov"], Any[2, "dec"], Any[3, "year"], Any[3, "match id"], Any[3, "host city"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "city id"], Any[0, "city"], Any[0, "hanzi"], Any[0, "hanyu pinyin"], Any[0, "regional population"], Any[0, "gdp"], Any[1, "match id"], Any[1, "date"], Any[1, "venue"], Any[1, "score"], Any[1, "result"], Any[1, "competition"], Any[2, "city id"], Any[2, "jan"], Any[2, "feb"], Any[2, "mar"], Any[2, "apr"], Any[2, "jun"], Any[2, "jul"], Any[2, "aug"], Any[2, "sep"], Any[2, "oct"], Any[2, "nov"], Any[2, "dec"], Any[3, "year"], Any[3, "match id"], Any[3, "host city"]]), names(dirty_table)))
+foreign_keys = ["city id", "match id", "host city"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "city"], Any[0, "hanzi"], Any[0, "hanyu pinyin"], Any[0, "regional population"], Any[0, "gdp"], Any[1, "date"], Any[1, "venue"], Any[1, "score"], Any[1, "result"], Any[1, "competition"], Any[2, "jan"], Any[2, "feb"], Any[2, "mar"], Any[2, "apr"], Any[2, "jun"], Any[2, "jul"], Any[2, "aug"], Any[2, "sep"], Any[2, "oct"], Any[2, "nov"], Any[2, "dec"], Any[3, "year"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -44,8 +66,9 @@ PClean.@model CityRecordModel begin
         competition ~ ChooseUniformly(possibilities[:competition])
     end
 
-    @class Temperature begin
-        city_id ~ Unmodeled()
+    @class Obs begin
+        city ~ City
+        match ~ Match
         jan ~ ChooseUniformly(possibilities[:jan])
         feb ~ ChooseUniformly(possibilities[:feb])
         mar ~ ChooseUniformly(possibilities[:mar])
@@ -57,19 +80,7 @@ PClean.@model CityRecordModel begin
         oct ~ ChooseUniformly(possibilities[:oct])
         nov ~ ChooseUniformly(possibilities[:nov])
         dec ~ ChooseUniformly(possibilities[:dec])
-    end
-
-    @class Hosting_City begin
         year ~ ChooseUniformly(possibilities[:year])
-        match_id ~ ChooseUniformly(possibilities[:match_id])
-        host_city ~ ChooseUniformly(possibilities[:host_city])
-    end
-
-    @class Obs begin
-        city ~ City
-        match ~ Match
-        temperature ~ Temperature
-        hosting_City ~ Hosting_City
     end
 end
 
@@ -86,18 +97,18 @@ query = @query CityRecordModel.Obs [
     match_score match.score
     match_result match.result
     match_competition match.competition
-    temperature_jan temperature.jan
-    temperature_feb temperature.feb
-    temperature_mar temperature.mar
-    temperature_apr temperature.apr
-    temperature_jun temperature.jun
-    temperature_jul temperature.jul
-    temperature_aug temperature.aug
-    temperature_sep temperature.sep
-    temperature_oct temperature.oct
-    temperature_nov temperature.nov
-    temperature_dec temperature.dec
-    hosting_city_year hosting_City.year
+    temperature_jan jan
+    temperature_feb feb
+    temperature_mar mar
+    temperature_apr apr
+    temperature_jun jun
+    temperature_jul jul
+    temperature_aug aug
+    temperature_sep sep
+    temperature_oct oct
+    temperature_nov nov
+    temperature_dec dec
+    hosting_city_year year
 ]
 
 
@@ -108,4 +119,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

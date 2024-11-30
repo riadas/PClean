@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("staff_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("staff_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "staff id"], Any[0, "gender"], Any[0, "first name"], Any[0, "last name"], Any[0, "email address"], Any[0, "phone number"], Any[1, "customer id"], Any[1, "customer type code"], Any[1, "address line 1"], Any[1, "address line 2"], Any[1, "town city"], Any[1, "state"], Any[1, "email address"], Any[1, "phone number"], Any[2, "product id"], Any[2, "parent product id"], Any[2, "product category code"], Any[2, "date product first available"], Any[2, "date product discontinued"], Any[2, "product name"], Any[2, "product description"], Any[2, "product price"], Any[3, "complaint id"], Any[3, "product id"], Any[3, "customer id"], Any[3, "complaint outcome code"], Any[3, "complaint status code"], Any[3, "complaint type code"], Any[3, "date complaint raised"], Any[3, "date complaint closed"], Any[3, "staff id"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "staff id"], Any[0, "gender"], Any[0, "first name"], Any[0, "last name"], Any[0, "email address"], Any[0, "phone number"], Any[1, "customer id"], Any[1, "customer type code"], Any[1, "address line 1"], Any[1, "address line 2"], Any[1, "town city"], Any[1, "state"], Any[1, "email address"], Any[1, "phone number"], Any[2, "product id"], Any[2, "parent product id"], Any[2, "product category code"], Any[2, "date product first available"], Any[2, "date product discontinued"], Any[2, "product name"], Any[2, "product description"], Any[2, "product price"], Any[3, "complaint id"], Any[3, "product id"], Any[3, "customer id"], Any[3, "complaint outcome code"], Any[3, "complaint status code"], Any[3, "complaint type code"], Any[3, "date complaint raised"], Any[3, "date complaint closed"], Any[3, "staff id"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "staff id"], Any[0, "gender"], Any[0, "first name"], Any[0, "last name"], Any[0, "email address"], Any[0, "phone number"], Any[1, "customer id"], Any[1, "customer type code"], Any[1, "address line 1"], Any[1, "address line 2"], Any[1, "town city"], Any[1, "state"], Any[1, "email address"], Any[1, "phone number"], Any[2, "product id"], Any[2, "parent product id"], Any[2, "product category code"], Any[2, "date product first available"], Any[2, "date product discontinued"], Any[2, "product name"], Any[2, "product description"], Any[2, "product price"], Any[3, "complaint id"], Any[3, "product id"], Any[3, "customer id"], Any[3, "complaint outcome code"], Any[3, "complaint status code"], Any[3, "complaint type code"], Any[3, "date complaint raised"], Any[3, "date complaint closed"], Any[3, "staff id"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "staff id"], Any[0, "gender"], Any[0, "first name"], Any[0, "last name"], Any[0, "email address"], Any[0, "phone number"], Any[1, "customer id"], Any[1, "customer type code"], Any[1, "address line 1"], Any[1, "address line 2"], Any[1, "town city"], Any[1, "state"], Any[1, "email address"], Any[1, "phone number"], Any[2, "product id"], Any[2, "parent product id"], Any[2, "product category code"], Any[2, "date product first available"], Any[2, "date product discontinued"], Any[2, "product name"], Any[2, "product description"], Any[2, "product price"], Any[3, "complaint id"], Any[3, "product id"], Any[3, "customer id"], Any[3, "complaint outcome code"], Any[3, "complaint status code"], Any[3, "complaint type code"], Any[3, "date complaint raised"], Any[3, "date complaint closed"], Any[3, "staff id"]]), names(dirty_table)))
+foreign_keys = ["customer id", "product id", "staff id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "gender"], Any[0, "first name"], Any[0, "last name"], Any[0, "email address"], Any[0, "phone number"], Any[1, "customer type code"], Any[1, "address line 1"], Any[1, "address line 2"], Any[1, "town city"], Any[1, "state"], Any[1, "email address"], Any[1, "phone number"], Any[2, "parent product id"], Any[2, "product category code"], Any[2, "date product first available"], Any[2, "date product discontinued"], Any[2, "product name"], Any[2, "product description"], Any[2, "product price"], Any[3, "complaint id"], Any[3, "complaint outcome code"], Any[3, "complaint status code"], Any[3, "complaint type code"], Any[3, "date complaint raised"], Any[3, "date complaint closed"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -57,23 +79,16 @@ PClean.@model CustomerComplaintsModel begin
         product_price ~ ChooseUniformly(possibilities[:product_price])
     end
 
-    @class Complaints begin
+    @class Obs begin
+        staff ~ Staff
+        customers ~ Customers
+        products ~ Products
         complaint_id ~ Unmodeled()
-        product_id ~ ChooseUniformly(possibilities[:product_id])
-        customer_id ~ ChooseUniformly(possibilities[:customer_id])
         complaint_outcome_code ~ ChooseUniformly(possibilities[:complaint_outcome_code])
         complaint_status_code ~ ChooseUniformly(possibilities[:complaint_status_code])
         complaint_type_code ~ ChooseUniformly(possibilities[:complaint_type_code])
         date_complaint_raised ~ TimePrior(possibilities[:date_complaint_raised])
         date_complaint_closed ~ TimePrior(possibilities[:date_complaint_closed])
-        staff_id ~ ChooseUniformly(possibilities[:staff_id])
-    end
-
-    @class Obs begin
-        staff ~ Staff
-        customers ~ Customers
-        products ~ Products
-        complaints ~ Complaints
     end
 end
 
@@ -100,12 +115,12 @@ query = @query CustomerComplaintsModel.Obs [
     products_product_name products.product_name
     products_product_description products.product_description
     products_product_price products.product_price
-    complaints_complaint_id complaints.complaint_id
-    complaints_complaint_outcome_code complaints.complaint_outcome_code
-    complaints_complaint_status_code complaints.complaint_status_code
-    complaints_complaint_type_code complaints.complaint_type_code
-    complaints_date_complaint_raised complaints.date_complaint_raised
-    complaints_date_complaint_closed complaints.date_complaint_closed
+    complaints_complaint_id complaint_id
+    complaints_complaint_outcome_code complaint_outcome_code
+    complaints_complaint_status_code complaint_status_code
+    complaints_complaint_type_code complaint_type_code
+    complaints_date_complaint_raised date_complaint_raised
+    complaints_date_complaint_closed date_complaint_closed
 ]
 
 
@@ -116,4 +131,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

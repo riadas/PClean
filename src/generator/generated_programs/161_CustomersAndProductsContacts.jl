@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("addresses_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("addresses_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "address id"], Any[0, "line 1 number building"], Any[0, "city"], Any[0, "zip postcode"], Any[0, "state province county"], Any[0, "country"], Any[1, "product id"], Any[1, "product type code"], Any[1, "product name"], Any[1, "product price"], Any[2, "customer id"], Any[2, "payment method code"], Any[2, "customer number"], Any[2, "customer name"], Any[2, "customer address"], Any[2, "customer phone"], Any[2, "customer email"], Any[3, "contact id"], Any[3, "customer id"], Any[3, "gender"], Any[3, "first name"], Any[3, "last name"], Any[3, "contact phone"], Any[4, "customer id"], Any[4, "address id"], Any[4, "date from"], Any[4, "date to"], Any[5, "order id"], Any[5, "customer id"], Any[5, "order date"], Any[5, "order status code"], Any[6, "order item id"], Any[6, "order id"], Any[6, "product id"], Any[6, "order quantity"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "address id"], Any[0, "line 1 number building"], Any[0, "city"], Any[0, "zip postcode"], Any[0, "state province county"], Any[0, "country"], Any[1, "product id"], Any[1, "product type code"], Any[1, "product name"], Any[1, "product price"], Any[2, "customer id"], Any[2, "payment method code"], Any[2, "customer number"], Any[2, "customer name"], Any[2, "customer address"], Any[2, "customer phone"], Any[2, "customer email"], Any[3, "contact id"], Any[3, "customer id"], Any[3, "gender"], Any[3, "first name"], Any[3, "last name"], Any[3, "contact phone"], Any[4, "customer id"], Any[4, "address id"], Any[4, "date from"], Any[4, "date to"], Any[5, "order id"], Any[5, "customer id"], Any[5, "order date"], Any[5, "order status code"], Any[6, "order item id"], Any[6, "order id"], Any[6, "product id"], Any[6, "order quantity"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "address id"], Any[0, "line 1 number building"], Any[0, "city"], Any[0, "zip postcode"], Any[0, "state province county"], Any[0, "country"], Any[1, "product id"], Any[1, "product type code"], Any[1, "product name"], Any[1, "product price"], Any[2, "customer id"], Any[2, "payment method code"], Any[2, "customer number"], Any[2, "customer name"], Any[2, "customer address"], Any[2, "customer phone"], Any[2, "customer email"], Any[3, "contact id"], Any[3, "customer id"], Any[3, "gender"], Any[3, "first name"], Any[3, "last name"], Any[3, "contact phone"], Any[4, "customer id"], Any[4, "address id"], Any[4, "date from"], Any[4, "date to"], Any[5, "order id"], Any[5, "customer id"], Any[5, "order date"], Any[5, "order status code"], Any[6, "order item id"], Any[6, "order id"], Any[6, "product id"], Any[6, "order quantity"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "address id"], Any[0, "line 1 number building"], Any[0, "city"], Any[0, "zip postcode"], Any[0, "state province county"], Any[0, "country"], Any[1, "product id"], Any[1, "product type code"], Any[1, "product name"], Any[1, "product price"], Any[2, "customer id"], Any[2, "payment method code"], Any[2, "customer number"], Any[2, "customer name"], Any[2, "customer address"], Any[2, "customer phone"], Any[2, "customer email"], Any[3, "contact id"], Any[3, "customer id"], Any[3, "gender"], Any[3, "first name"], Any[3, "last name"], Any[3, "contact phone"], Any[4, "customer id"], Any[4, "address id"], Any[4, "date from"], Any[4, "date to"], Any[5, "order id"], Any[5, "customer id"], Any[5, "order date"], Any[5, "order status code"], Any[6, "order item id"], Any[6, "order id"], Any[6, "product id"], Any[6, "order quantity"]]), names(dirty_table)))
+foreign_keys = ["address id", "customer id", "customer id", "order id", "product id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "line 1 number building"], Any[0, "city"], Any[0, "zip postcode"], Any[0, "state province county"], Any[0, "country"], Any[1, "product type code"], Any[1, "product name"], Any[1, "product price"], Any[2, "payment method code"], Any[2, "customer number"], Any[2, "customer name"], Any[2, "customer address"], Any[2, "customer phone"], Any[2, "customer email"], Any[3, "contact id"], Any[3, "gender"], Any[3, "first name"], Any[3, "last name"], Any[3, "contact phone"], Any[4, "date from"], Any[4, "date to"], Any[5, "order date"], Any[5, "order status code"], Any[6, "order item id"], Any[6, "order quantity"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -61,35 +83,18 @@ PClean.@model CustomersAndProductsContactsModel begin
         contact_phone ~ ChooseUniformly(possibilities[:contact_phone])
     end
 
-    @class Customer_Address_History begin
-        customer_id ~ Unmodeled()
-        address_id ~ ChooseUniformly(possibilities[:address_id])
-        date_from ~ TimePrior(possibilities[:date_from])
-        date_to ~ TimePrior(possibilities[:date_to])
-    end
-
-    @class Customer_Orders begin
-        order_id ~ Unmodeled()
-        customer_id ~ ChooseUniformly(possibilities[:customer_id])
-        order_date ~ TimePrior(possibilities[:order_date])
-        order_status_code ~ ChooseUniformly(possibilities[:order_status_code])
-    end
-
-    @class Order_Items begin
-        order_item_id ~ Unmodeled()
-        order_id ~ ChooseUniformly(possibilities[:order_id])
-        product_id ~ ChooseUniformly(possibilities[:product_id])
-        order_quantity ~ ChooseUniformly(possibilities[:order_quantity])
-    end
-
     @class Obs begin
         addresses ~ Addresses
         products ~ Products
         customers ~ Customers
         contacts ~ Contacts
-        customer_Address_History ~ Customer_Address_History
-        customer_Orders ~ Customer_Orders
-        order_Items ~ Order_Items
+        date_from ~ TimePrior(possibilities[:date_from])
+        date_to ~ TimePrior(possibilities[:date_to])
+        order_id ~ Unmodeled()
+        order_date ~ TimePrior(possibilities[:order_date])
+        order_status_code ~ ChooseUniformly(possibilities[:order_status_code])
+        order_item_id ~ Unmodeled()
+        order_quantity ~ ChooseUniformly(possibilities[:order_quantity])
     end
 end
 
@@ -117,13 +122,13 @@ query = @query CustomersAndProductsContactsModel.Obs [
     contacts_first_name contacts.first_name
     contacts_last_name contacts.last_name
     contacts_contact_phone contacts.contact_phone
-    customer_address_history_date_from customer_Address_History.date_from
-    customer_address_history_date_to customer_Address_History.date_to
-    customer_orders_order_id customer_Orders.order_id
-    customer_orders_order_date customer_Orders.order_date
-    customer_orders_order_status_code customer_Orders.order_status_code
-    order_items_order_item_id order_Items.order_item_id
-    order_items_order_quantity order_Items.order_quantity
+    customer_address_history_date_from date_from
+    customer_address_history_date_to date_to
+    customer_orders_order_id order_id
+    customer_orders_order_date order_date
+    customer_orders_order_status_code order_status_code
+    order_items_order_item_id order_item_id
+    order_items_order_quantity order_quantity
 ]
 
 
@@ -134,4 +139,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

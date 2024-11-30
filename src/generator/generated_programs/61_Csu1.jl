@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("campuses_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("campuses_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "id"], Any[0, "campus"], Any[0, "location"], Any[0, "county"], Any[0, "year"], Any[1, "campus"], Any[1, "year"], Any[1, "campus fee"], Any[2, "year"], Any[2, "campus"], Any[2, "degrees"], Any[3, "campus"], Any[3, "discipline"], Any[3, "year"], Any[3, "undergraduate"], Any[3, "graduate"], Any[4, "campus"], Any[4, "year"], Any[4, "totalenrollment ay"], Any[4, "fte ay"], Any[5, "campus"], Any[5, "year"], Any[5, "faculty"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "id"], Any[0, "campus"], Any[0, "location"], Any[0, "county"], Any[0, "year"], Any[1, "campus"], Any[1, "year"], Any[1, "campus fee"], Any[2, "year"], Any[2, "campus"], Any[2, "degrees"], Any[3, "campus"], Any[3, "discipline"], Any[3, "year"], Any[3, "undergraduate"], Any[3, "graduate"], Any[4, "campus"], Any[4, "year"], Any[4, "totalenrollment ay"], Any[4, "fte ay"], Any[5, "campus"], Any[5, "year"], Any[5, "faculty"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "id"], Any[0, "campus"], Any[0, "location"], Any[0, "county"], Any[0, "year"], Any[1, "campus"], Any[1, "year"], Any[1, "campus fee"], Any[2, "year"], Any[2, "campus"], Any[2, "degrees"], Any[3, "campus"], Any[3, "discipline"], Any[3, "year"], Any[3, "undergraduate"], Any[3, "graduate"], Any[4, "campus"], Any[4, "year"], Any[4, "totalenrollment ay"], Any[4, "fte ay"], Any[5, "campus"], Any[5, "year"], Any[5, "faculty"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "id"], Any[0, "campus"], Any[0, "location"], Any[0, "county"], Any[0, "year"], Any[1, "campus"], Any[1, "year"], Any[1, "campus fee"], Any[2, "year"], Any[2, "campus"], Any[2, "degrees"], Any[3, "campus"], Any[3, "discipline"], Any[3, "year"], Any[3, "undergraduate"], Any[3, "graduate"], Any[4, "campus"], Any[4, "year"], Any[4, "totalenrollment ay"], Any[4, "fte ay"], Any[5, "campus"], Any[5, "year"], Any[5, "faculty"]]), names(dirty_table)))
+foreign_keys = ["campus", "campus", "campus", "campus", "campus"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "id"], Any[0, "location"], Any[0, "county"], Any[0, "year"], Any[1, "year"], Any[1, "campus fee"], Any[2, "year"], Any[2, "degrees"], Any[3, "discipline"], Any[3, "year"], Any[3, "undergraduate"], Any[3, "graduate"], Any[4, "year"], Any[4, "totalenrollment ay"], Any[4, "fte ay"], Any[5, "year"], Any[5, "faculty"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -34,46 +56,21 @@ PClean.@model Csu1Model begin
         year ~ ChooseUniformly(possibilities[:year])
     end
 
-    @class Csu_Fees begin
-        campus ~ ChooseUniformly(possibilities[:campus])
+    @class Obs begin
+        campuses ~ Campuses
         year ~ ChooseUniformly(possibilities[:year])
         campus_fee ~ ChooseUniformly(possibilities[:campus_fee])
-    end
-
-    @class Degrees begin
         year ~ ChooseUniformly(possibilities[:year])
-        campus ~ ChooseUniformly(possibilities[:campus])
         degrees ~ ChooseUniformly(possibilities[:degrees])
-    end
-
-    @class Discipline_Enrollments begin
-        campus ~ ChooseUniformly(possibilities[:campus])
         discipline ~ ChooseUniformly(possibilities[:discipline])
         year ~ ChooseUniformly(possibilities[:year])
         undergraduate ~ ChooseUniformly(possibilities[:undergraduate])
         graduate ~ ChooseUniformly(possibilities[:graduate])
-    end
-
-    @class Enrollments begin
-        campus ~ ChooseUniformly(possibilities[:campus])
         year ~ ChooseUniformly(possibilities[:year])
         totalenrollment_ay ~ ChooseUniformly(possibilities[:totalenrollment_ay])
         fte_ay ~ ChooseUniformly(possibilities[:fte_ay])
-    end
-
-    @class Faculty begin
-        campus ~ ChooseUniformly(possibilities[:campus])
         year ~ ChooseUniformly(possibilities[:year])
         faculty ~ ChooseUniformly(possibilities[:faculty])
-    end
-
-    @class Obs begin
-        campuses ~ Campuses
-        csu_Fees ~ Csu_Fees
-        degrees ~ Degrees
-        discipline_Enrollments ~ Discipline_Enrollments
-        enrollments ~ Enrollments
-        faculty ~ Faculty
     end
 end
 
@@ -83,19 +80,19 @@ query = @query Csu1Model.Obs [
     campuses_location campuses.location
     campuses_county campuses.county
     campuses_year campuses.year
-    csu_fees_year csu_Fees.year
-    csu_fees_campus_fee csu_Fees.campus_fee
-    degrees_year degrees.year
-    degrees degrees.degrees
-    discipline_enrollments_discipline discipline_Enrollments.discipline
-    discipline_enrollments_year discipline_Enrollments.year
-    discipline_enrollments_undergraduate discipline_Enrollments.undergraduate
-    discipline_enrollments_graduate discipline_Enrollments.graduate
-    enrollments_year enrollments.year
-    enrollments_totalenrollment_ay enrollments.totalenrollment_ay
-    enrollments_fte_ay enrollments.fte_ay
-    faculty_year faculty.year
-    faculty faculty.faculty
+    csu_fees_year year
+    csu_fees_campus_fee campus_fee
+    degrees_year year
+    degrees degrees
+    discipline_enrollments_discipline discipline
+    discipline_enrollments_year year
+    discipline_enrollments_undergraduate undergraduate
+    discipline_enrollments_graduate graduate
+    enrollments_year year
+    enrollments_totalenrollment_ay totalenrollment_ay
+    enrollments_fte_ay fte_ay
+    faculty_year year
+    faculty faculty
 ]
 
 
@@ -106,4 +103,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

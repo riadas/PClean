@@ -7,7 +7,7 @@ using DataStructures
 tables = JSON.parsefile("src/generator/spider_data/tables.json")
 spaces = 4
 tab = join(map(x -> " ", 1:spaces))
-function generate_program2(table_index=1; random=false, custom=nothing)
+function generate_program2(table_index=1; random=false, custom=nothing, prior_spec=nothing)
     if !isnothing(custom)
         custom_schema_file, custom_error_file, custom_data_file = custom
         open(custom_schema_file) do f 
@@ -177,10 +177,10 @@ function generate_program2(table_index=1; random=false, custom=nothing)
     $(units_str)
 
     PClean.@model $(model_name)Model begin
-    $(generate_classes(table, error_json, possibilities))
+    $(generate_classes2(table, error_json, possibilities, prior_spec))
     end
 
-    $(generate_query(table, error_json, column_renaming_dict_reverse, manual_join))
+    $(generate_query2(table, error_json, column_renaming_dict_reverse, manual_join))
 
     observations = [ObservedDataset(query, dirty_table)]
     config = PClean.InferenceConfig($(size(dirty_table, 1) > 10000 ? 1 : 5), 2; use_mh_instead_of_pg=true)
@@ -193,7 +193,7 @@ function generate_program2(table_index=1; random=false, custom=nothing)
     """
 end
 
-function generate_classes(table_json, error_json, possibilities)
+function generate_classes2(table_json, error_json, possibilities, custom_priors)
     has_errors = length(keys(error_json)) != 0
 
     class_strings = []
@@ -242,7 +242,7 @@ function generate_classes(table_json, error_json, possibilities)
                     formatted_col = """$(tab)$(tab)$(unformatted_foreign_class) ~ $(formatted_foreign_class)"""
                     push!(formatted_columns, formatted_col)
                 else
-                    formatted_col = """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior(table_json, index, tup[1], error_json, possibilities))"""
+                    formatted_col = """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior2(table_json, index, tup[1], error_json, possibilities, custom_priors))"""
                     push!(formatted_columns, formatted_col)
                 end
             end
@@ -297,7 +297,7 @@ function generate_classes(table_json, error_json, possibilities)
                 println(variation_column_index)
                 println("class_index")
                 println(class_index)
-                prior = "$(variation_column) ~ $(generate_prior(table_json, class_index + 1, variation_column_index, error_json, possibilities))"
+                prior = "$(variation_column) ~ $(generate_prior2(table_json, class_index + 1, variation_column_index, error_json, possibilities, custom_priors))"
                 class_str = """$(tab)@class $(formatted_class) begin
                 $(tab)$(tab)$(prior)
                 $(tab)end"""
@@ -459,7 +459,7 @@ function compute_table_prefix(column_index, table_json)
     end
 end
 
-function generate_query(table_json, error_json, column_renaming_dict_reverse, manual_join)
+function generate_query2(table_json, error_json, column_renaming_dict_reverse, manual_join)
     has_errors = length(keys(error_json)) != 0
     query_column_strings = []
     non_primary_classes = map(tup -> table_json["table_names"][table_json["column_names"][tup[1] + 1][1] + 1], table_json["foreign_keys"])
@@ -519,7 +519,7 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
     """
 end
 
-function generate_prior(table_json, class_index, col_index, error_json, ps)
+function generate_prior2(table_json, class_index, col_index, error_json, ps, custom_priors=nothing)
     class = table_json["table_names"][class_index]
 
     has_errors = length(keys(error_json)) != 0
@@ -544,6 +544,20 @@ function generate_prior(table_json, class_index, col_index, error_json, ps)
         return "Unmodeled()"
     end
     
+    if custom_priors != nothing && (class_index, col_index) in keys(custom_priors)
+        option_number = custom_prior[(class_index, col_index)]
+        if option_number == 1 
+            return "ChooseUniformly(possibilities[:$(formatted_column_name)])"
+        elseif option_number == 2
+            if Symbol(column_name) in keys(ps)
+                max_length = maximum(map(x -> length(x), ps[Symbol(column_name)]))
+                min_length = minimum(map(x -> length(x), ps[Symbol(column_name)]))
+                return "StringPrior($(min_length), $(max_length), possibilities[:$(formatted_column_name)])"
+            else
+                return "StringPrior(5, 35, possibilities[:$(formatted_column_name)])"
+            end
+        end
+    end
 
     if column_type == "text"
         if Symbol(column_name) in keys(ps) && length(ps[Symbol(column_name)]) > 100 
@@ -575,11 +589,12 @@ end
 
 
 # for i in 1:length(tables)
+#     println("GENERATING")
 #     println(i)
 #     t = tables[i]
 #     name = join(map(x -> capitalize(x), split(t["db_id"], "_")), "")
-#     open("src/generator/generated_programs/$(string(i))_$(name).jl", "w+") do file
-#         write(file, generate_program(i))
+#     open("src/generator/generated_programs2/$(string(i))_$(name).jl", "w+") do file
+#         write(file, generate_program2(i))
 #     end
 # end
 

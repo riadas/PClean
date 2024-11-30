@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("member_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("member_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "member id"], Any[0, "name"], Any[0, "nationality"], Any[0, "role"], Any[1, "performance id"], Any[1, "date"], Any[1, "host"], Any[1, "location"], Any[1, "attendance"], Any[2, "member id"], Any[2, "performance id"], Any[2, "num of pieces"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "member id"], Any[0, "name"], Any[0, "nationality"], Any[0, "role"], Any[1, "performance id"], Any[1, "date"], Any[1, "host"], Any[1, "location"], Any[1, "attendance"], Any[2, "member id"], Any[2, "performance id"], Any[2, "num of pieces"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "member id"], Any[0, "name"], Any[0, "nationality"], Any[0, "role"], Any[1, "performance id"], Any[1, "date"], Any[1, "host"], Any[1, "location"], Any[1, "attendance"], Any[2, "member id"], Any[2, "performance id"], Any[2, "num of pieces"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "member id"], Any[0, "name"], Any[0, "nationality"], Any[0, "role"], Any[1, "performance id"], Any[1, "date"], Any[1, "host"], Any[1, "location"], Any[1, "attendance"], Any[2, "member id"], Any[2, "performance id"], Any[2, "num of pieces"]]), names(dirty_table)))
+foreign_keys = ["performance id", "member id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "name"], Any[0, "nationality"], Any[0, "role"], Any[1, "date"], Any[1, "host"], Any[1, "location"], Any[1, "attendance"], Any[2, "num of pieces"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -41,16 +63,10 @@ PClean.@model PerformanceAttendanceModel begin
         attendance ~ ChooseUniformly(possibilities[:attendance])
     end
 
-    @class Member_Attendance begin
-        member_id ~ Unmodeled()
-        performance_id ~ ChooseUniformly(possibilities[:performance_id])
-        num_of_pieces ~ ChooseUniformly(possibilities[:num_of_pieces])
-    end
-
     @class Obs begin
         member ~ Member
         performance ~ Performance
-        member_Attendance ~ Member_Attendance
+        num_of_pieces ~ ChooseUniformly(possibilities[:num_of_pieces])
     end
 end
 
@@ -64,7 +80,7 @@ query = @query PerformanceAttendanceModel.Obs [
     performance_host performance.host
     performance_location performance.location
     performance_attendance performance.attendance
-    member_attendance_num_of_pieces member_Attendance.num_of_pieces
+    member_attendance_num_of_pieces num_of_pieces
 ]
 
 
@@ -75,4 +91,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("follows_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("follows_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "user id"], Any[0, "follower id"], Any[1, "id"], Any[1, "user id"], Any[1, "text"], Any[1, "create date"], Any[2, "uid"], Any[2, "name"], Any[2, "email"], Any[2, "partition id"], Any[2, "followers"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "user id"], Any[0, "follower id"], Any[1, "id"], Any[1, "user id"], Any[1, "text"], Any[1, "create date"], Any[2, "uid"], Any[2, "name"], Any[2, "email"], Any[2, "partition id"], Any[2, "followers"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "user id"], Any[0, "follower id"], Any[1, "id"], Any[1, "user id"], Any[1, "text"], Any[1, "create date"], Any[2, "uid"], Any[2, "name"], Any[2, "email"], Any[2, "partition id"], Any[2, "followers"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "user id"], Any[0, "follower id"], Any[1, "id"], Any[1, "user id"], Any[1, "text"], Any[1, "create date"], Any[2, "uid"], Any[2, "name"], Any[2, "email"], Any[2, "partition id"], Any[2, "followers"]]), names(dirty_table)))
+foreign_keys = ["follower id", "user id", "user id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[1, "id"], Any[1, "text"], Any[1, "create date"], Any[2, "uid"], Any[2, "name"], Any[2, "email"], Any[2, "partition id"], Any[2, "followers"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -26,18 +48,6 @@ possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
 
 
 PClean.@model Twitter1Model begin
-    @class Follows begin
-        user_id ~ Unmodeled()
-        follower_id ~ ChooseUniformly(possibilities[:follower_id])
-    end
-
-    @class Tweets begin
-        id ~ Unmodeled()
-        user_id ~ ChooseUniformly(possibilities[:user_id])
-        text ~ ChooseUniformly(possibilities[:text])
-        create_date ~ TimePrior(possibilities[:create_date])
-    end
-
     @class User_Profiles begin
         uid ~ Unmodeled()
         name ~ ChooseUniformly(possibilities[:name])
@@ -47,16 +57,17 @@ PClean.@model Twitter1Model begin
     end
 
     @class Obs begin
-        follows ~ Follows
-        tweets ~ Tweets
         user_Profiles ~ User_Profiles
+        id ~ Unmodeled()
+        text ~ ChooseUniformly(possibilities[:text])
+        create_date ~ TimePrior(possibilities[:create_date])
     end
 end
 
 query = @query Twitter1Model.Obs [
-    tweets_id tweets.id
-    tweets_text tweets.text
-    tweets_create_date tweets.create_date
+    tweets_id id
+    tweets_text text
+    tweets_create_date create_date
     user_profiles_uid user_Profiles.uid
     user_profiles_name user_Profiles.name
     user_profiles_email user_Profiles.email
@@ -72,4 +83,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

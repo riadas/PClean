@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("repair_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("repair_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "repair id"], Any[0, "name"], Any[0, "launch date"], Any[0, "notes"], Any[1, "machine id"], Any[1, "making year"], Any[1, "class"], Any[1, "team"], Any[1, "machine series"], Any[1, "value points"], Any[1, "quality rank"], Any[2, "technician id"], Any[2, "name"], Any[2, "team"], Any[2, "starting year"], Any[2, "age"], Any[3, "technician id"], Any[3, "repair id"], Any[3, "machine id"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "repair id"], Any[0, "name"], Any[0, "launch date"], Any[0, "notes"], Any[1, "machine id"], Any[1, "making year"], Any[1, "class"], Any[1, "team"], Any[1, "machine series"], Any[1, "value points"], Any[1, "quality rank"], Any[2, "technician id"], Any[2, "name"], Any[2, "team"], Any[2, "starting year"], Any[2, "age"], Any[3, "technician id"], Any[3, "repair id"], Any[3, "machine id"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "repair id"], Any[0, "name"], Any[0, "launch date"], Any[0, "notes"], Any[1, "machine id"], Any[1, "making year"], Any[1, "class"], Any[1, "team"], Any[1, "machine series"], Any[1, "value points"], Any[1, "quality rank"], Any[2, "technician id"], Any[2, "name"], Any[2, "team"], Any[2, "starting year"], Any[2, "age"], Any[3, "technician id"], Any[3, "repair id"], Any[3, "machine id"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "repair id"], Any[0, "name"], Any[0, "launch date"], Any[0, "notes"], Any[1, "machine id"], Any[1, "making year"], Any[1, "class"], Any[1, "team"], Any[1, "machine series"], Any[1, "value points"], Any[1, "quality rank"], Any[2, "technician id"], Any[2, "name"], Any[2, "team"], Any[2, "starting year"], Any[2, "age"], Any[3, "technician id"], Any[3, "repair id"], Any[3, "machine id"]]), names(dirty_table)))
+foreign_keys = ["machine id", "repair id", "technician id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "name"], Any[0, "launch date"], Any[0, "notes"], Any[1, "making year"], Any[1, "class"], Any[1, "team"], Any[1, "machine series"], Any[1, "value points"], Any[1, "quality rank"], Any[2, "name"], Any[2, "team"], Any[2, "starting year"], Any[2, "age"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -51,17 +73,10 @@ PClean.@model MachineRepairModel begin
         age ~ ChooseUniformly(possibilities[:age])
     end
 
-    @class Repair_Assignment begin
-        technician_id ~ Unmodeled()
-        repair_id ~ ChooseUniformly(possibilities[:repair_id])
-        machine_id ~ ChooseUniformly(possibilities[:machine_id])
-    end
-
     @class Obs begin
         repair ~ Repair
         machine ~ Machine
         technician ~ Technician
-        repair_Assignment ~ Repair_Assignment
     end
 end
 
@@ -92,4 +107,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

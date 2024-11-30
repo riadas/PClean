@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("medicine_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("medicine_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "trade name"], Any[0, "fda approved"], Any[1, "id"], Any[1, "name"], Any[1, "location"], Any[1, "product"], Any[1, "chromosome"], Any[1, "omim"], Any[1, "porphyria"], Any[2, "enzyme id"], Any[2, "medicine id"], Any[2, "interaction type"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "trade name"], Any[0, "fda approved"], Any[1, "id"], Any[1, "name"], Any[1, "location"], Any[1, "product"], Any[1, "chromosome"], Any[1, "omim"], Any[1, "porphyria"], Any[2, "enzyme id"], Any[2, "medicine id"], Any[2, "interaction type"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "trade name"], Any[0, "fda approved"], Any[1, "id"], Any[1, "name"], Any[1, "location"], Any[1, "product"], Any[1, "chromosome"], Any[1, "omim"], Any[1, "porphyria"], Any[2, "enzyme id"], Any[2, "medicine id"], Any[2, "interaction type"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "trade name"], Any[0, "fda approved"], Any[1, "id"], Any[1, "name"], Any[1, "location"], Any[1, "product"], Any[1, "chromosome"], Any[1, "omim"], Any[1, "porphyria"], Any[2, "enzyme id"], Any[2, "medicine id"], Any[2, "interaction type"]]), names(dirty_table)))
+foreign_keys = ["medicine id", "enzyme id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "trade name"], Any[0, "fda approved"], Any[1, "id"], Any[1, "name"], Any[1, "location"], Any[1, "product"], Any[1, "chromosome"], Any[1, "omim"], Any[1, "porphyria"], Any[2, "interaction type"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -43,16 +65,10 @@ PClean.@model MedicineEnzymeInteractionModel begin
         porphyria ~ ChooseUniformly(possibilities[:porphyria])
     end
 
-    @class Medicine_Enzyme_Interaction begin
-        enzyme_id ~ Unmodeled()
-        medicine_id ~ ChooseUniformly(possibilities[:medicine_id])
-        interaction_type ~ ChooseUniformly(possibilities[:interaction_type])
-    end
-
     @class Obs begin
         medicine ~ Medicine
         enzyme ~ Enzyme
-        medicine_Enzyme_Interaction ~ Medicine_Enzyme_Interaction
+        interaction_type ~ ChooseUniformly(possibilities[:interaction_type])
     end
 end
 
@@ -68,7 +84,7 @@ query = @query MedicineEnzymeInteractionModel.Obs [
     enzyme_chromosome enzyme.chromosome
     enzyme_omim enzyme.omim
     enzyme_porphyria enzyme.porphyria
-    medicine_enzyme_interaction_interaction_type medicine_Enzyme_Interaction.interaction_type
+    medicine_enzyme_interaction_interaction_type interaction_type
 ]
 
 
@@ -79,4 +95,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)

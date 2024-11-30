@@ -7,7 +7,7 @@ using DataFrames: DataFrame
 tables = JSON.parsefile("src/generator/spider_data/tables.json")
 spaces = 4
 tab = join(map(x -> " ", 1:spaces))
-function generate_program(table_index=1; random=false, custom=nothing)
+function generate_program(table_index=1; random=false, custom=nothing, prior_spec=nothing)
     if !isnothing(custom)
         custom_schema_file, custom_error_file, custom_data_file = custom
         open(custom_schema_file) do f 
@@ -139,6 +139,10 @@ function generate_program(table_index=1; random=false, custom=nothing)
     clean_table = CSV.File(replace("$(custom_data_file)", "dirty.csv" => "clean.csv")) |> DataFrame
     $(clean_table_modification)
 
+    subset_size = length(dirty_table)
+    dirty_table = first(dirty_table, subset_size)
+    clean_table = first(clean_table, subset_size)
+
     omitted = []
     if length(names(dirty_table)) != length($(table["column_names"]))
         for dirty_name in names(dirty_table)
@@ -175,7 +179,7 @@ function generate_program(table_index=1; random=false, custom=nothing)
     $(units_str)
 
     PClean.@model $(model_name)Model begin
-    $(generate_classes(table, error_json, possibilities))
+    $(generate_classes(table, error_json, possibilities, prior_spec))
     end
 
     $(generate_query(table, error_json, column_renaming_dict_reverse, manual_join))
@@ -187,11 +191,12 @@ function generate_program(table_index=1; random=false, custom=nothing)
         run_inference!(tr, config)
     end
 
-    println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+    accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+    println(accuracy)
     """
 end
 
-function generate_classes(table_json, error_json, possibilities)
+function generate_classes(table_json, error_json, possibilities, custom_priors)
     has_errors = length(keys(error_json)) != 0
 
     class_strings = []
@@ -212,7 +217,7 @@ function generate_classes(table_json, error_json, possibilities)
                 columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), columns)
             end
     
-            formatted_columns = map(tup -> """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior(table_json, index, tup[1], error_json, possibilities))""", enumerate(filter(x -> x[1] == index - 1, columns)))
+            formatted_columns = map(tup -> """$(tab)$(tab)$(replace(tup[2][2], " " => "_")) ~ $(generate_prior(table_json, index, tup[1], error_json, possibilities, custom_priors))""", enumerate(filter(x -> x[1] == index - 1, columns)))
     
             class_str = """$(tab)@class $(formatted_class) begin
         $(join(formatted_columns, "\n"))
@@ -251,7 +256,7 @@ function generate_classes(table_json, error_json, possibilities)
                 println(variation_column_index)
                 println("class_index")
                 println(class_index)
-                prior = "$(variation_column) ~ $(generate_prior(table_json, class_index + 1, variation_column_index, error_json, possibilities))"
+                prior = "$(variation_column) ~ $(generate_prior(table_json, class_index + 1, variation_column_index, error_json, possibilities, custom_priors))"
                 class_str = """$(tab)@class $(formatted_class) begin
                 $(tab)$(tab)$(prior)
                 $(tab)end"""
@@ -327,7 +332,7 @@ function generate_classes(table_json, error_json, possibilities)
                             if original_table_name in non_primary_classes 
                                 class_index = column[1] + 1
                                 col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]    
-                                obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
+                                obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities, custom_priors))"""
                                 obs_err_str = "$(tab)$(tab)$(column_name)_typo ~ AddTypos($(column_name), 2)"
                                 obs_column_str = join([obs_column_str, obs_err_str], "\n")
                             else
@@ -368,7 +373,7 @@ function generate_classes(table_json, error_json, possibilities)
                             # no error, but this field still needs to be instantiated b/c it is not in a primary table
                             class_index = column[1] + 1
                             col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]
-                            obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
+                            obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities, custom_priors))"""
                         else 
                             handled[string(index) * "_" * string(column[2])] = true
                             continue
@@ -377,7 +382,7 @@ function generate_classes(table_json, error_json, possibilities)
                     elseif original_table_name in non_primary_classes
                         class_index = column[1] + 1
                         col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]
-                        obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities))"""
+                        obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities, custom_priors))"""
                     else
                         handled[string(index) * "_" * string(column[2])] = true
                         continue
@@ -468,7 +473,7 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
     """
 end
 
-function generate_prior(table_json, class_index, col_index, error_json, ps)
+function generate_prior(table_json, class_index, col_index, error_json, ps, custom_priors=nothing)
     class = table_json["table_names"][class_index]
 
     has_errors = length(keys(error_json)) != 0
@@ -492,7 +497,21 @@ function generate_prior(table_json, class_index, col_index, error_json, ps)
     if col_index == 1 && occursin("id", column_name) && column_type in ["number", "integer"]
         return "Unmodeled()"
     end
-    
+
+    if custom_priors != nothing && (class_index, col_index) in keys(custom_priors)
+        option_number = custom_prior[(class_index, col_index)]
+        if option_number == 1 
+            return "ChooseUniformly(possibilities[:$(formatted_column_name)])"
+        elseif option_number == 2
+            if Symbol(column_name) in keys(ps)
+                max_length = maximum(map(x -> length(x), ps[Symbol(column_name)]))
+                min_length = minimum(map(x -> length(x), ps[Symbol(column_name)]))
+                return "StringPrior($(min_length), $(max_length), possibilities[:$(formatted_column_name)])"
+            else
+                return "StringPrior(5, 35, possibilities[:$(formatted_column_name)])"
+            end
+        end
+    end
 
     if column_type == "text"
         if Symbol(column_name) in keys(ps) && length(ps[Symbol(column_name)]) > 100 

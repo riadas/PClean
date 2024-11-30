@@ -7,13 +7,35 @@ using Statistics
 dirty_table = CSV.File("all star_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("all star_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
+
+subset_size = length(dirty_table)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "player id"], Any[0, "year"], Any[0, "game num"], Any[0, "game id"], Any[0, "team id"], Any[0, "league id"], Any[0, "gp"], Any[0, "starting pos"], Any[1, "year"], Any[1, "team id"], Any[1, "league id"], Any[1, "player id"], Any[1, "g all"], Any[1, "gs"], Any[1, "g batting"], Any[1, "g defense"], Any[1, "g p"], Any[1, "g c"], Any[1, "g 1b"], Any[1, "g 2b"], Any[1, "g 3b"], Any[1, "g ss"], Any[1, "g lf"], Any[1, "g cf"], Any[1, "g rf"], Any[1, "g of"], Any[1, "g dh"], Any[1, "g ph"], Any[1, "g pr"], Any[2, "player id"], Any[2, "award id"], Any[2, "year"], Any[2, "league id"], Any[2, "tie"], Any[2, "notes"], Any[3, "player id"], Any[3, "award id"], Any[3, "year"], Any[3, "league id"], Any[3, "tie"], Any[3, "notes"], Any[4, "award id"], Any[4, "year"], Any[4, "league id"], Any[4, "player id"], Any[4, "points won"], Any[4, "points max"], Any[4, "votes first"], Any[5, "award id"], Any[5, "year"], Any[5, "league id"], Any[5, "player id"], Any[5, "points won"], Any[5, "points max"], Any[5, "votes first"], Any[6, "player id"], Any[6, "year"], Any[6, "stint"], Any[6, "team id"], Any[6, "league id"], Any[6, "g"], Any[6, "ab"], Any[6, "r"], Any[6, "h"], Any[6, "double"], Any[6, "triple"], Any[6, "hr"], Any[6, "rbi"], Any[6, "sb"], Any[6, "cs"], Any[6, "bb"], Any[6, "so"], Any[6, "ibb"], Any[6, "hbp"], Any[6, "sh"], Any[6, "sf"], Any[6, "g idp"], Any[7, "year"], Any[7, "round"], Any[7, "player id"], Any[7, "team id"], Any[7, "league id"], Any[7, "g"], Any[7, "ab"], Any[7, "r"], Any[7, "h"], Any[7, "double"], Any[7, "triple"], Any[7, "hr"], Any[7, "rbi"], Any[7, "sb"], Any[7, "cs"], Any[7, "bb"], Any[7, "so"], Any[7, "ibb"], Any[7, "hbp"], Any[7, "sh"], Any[7, "sf"], Any[7, "g idp"], Any[8, "player id"], Any[8, "college id"], Any[8, "year"], Any[9, "player id"], Any[9, "year"], Any[9, "stint"], Any[9, "team id"], Any[9, "league id"], Any[9, "pos"], Any[9, "g"], Any[9, "gs"], Any[9, "inn outs"], Any[9, "po"], Any[9, "a"], Any[9, "e"], Any[9, "dp"], Any[9, "pb"], Any[9, "wp"], Any[9, "sb"], Any[9, "cs"], Any[9, "zr"], Any[10, "player id"], Any[10, "year"], Any[10, "stint"], Any[10, "glf"], Any[10, "gcf"], Any[10, "grf"], Any[11, "player id"], Any[11, "year"], Any[11, "team id"], Any[11, "league id"], Any[11, "round"], Any[11, "pos"], Any[11, "g"], Any[11, "gs"], Any[11, "inn outs"], Any[11, "po"], Any[11, "a"], Any[11, "e"], Any[11, "dp"], Any[11, "tp"], Any[11, "pb"], Any[11, "sb"], Any[11, "cs"], Any[12, "player id"], Any[12, "yearid"], Any[12, "votedby"], Any[12, "ballots"], Any[12, "needed"], Any[12, "votes"], Any[12, "inducted"], Any[12, "category"], Any[12, "needed note"], Any[13, "year"], Any[13, "league id"], Any[13, "team id"], Any[13, "park id"], Any[13, "span first"], Any[13, "span last"], Any[13, "games"], Any[13, "openings"], Any[13, "attendance"], Any[14, "player id"], Any[14, "year"], Any[14, "team id"], Any[14, "league id"], Any[14, "inseason"], Any[14, "g"], Any[14, "w"], Any[14, "l"], Any[14, "rank"], Any[14, "plyr mgr"], Any[15, "player id"], Any[15, "year"], Any[15, "team id"], Any[15, "league id"], Any[15, "inseason"], Any[15, "half"], Any[15, "g"], Any[15, "w"], Any[15, "l"], Any[15, "rank"], Any[16, "player id"], Any[16, "birth year"], Any[16, "birth month"], Any[16, "birth day"], Any[16, "birth country"], Any[16, "birth state"], Any[16, "birth city"], Any[16, "death year"], Any[16, "death month"], Any[16, "death day"], Any[16, "death country"], Any[16, "death state"], Any[16, "death city"], Any[16, "name first"], Any[16, "name last"], Any[16, "name given"], Any[16, "weight"], Any[16, "height"], Any[16, "bats"], Any[16, "throws"], Any[16, "debut"], Any[16, "final game"], Any[16, "retro id"], Any[16, "bbref id"], Any[17, "park id"], Any[17, "park name"], Any[17, "park alias"], Any[17, "city"], Any[17, "state"], Any[17, "country"], Any[18, "player id"], Any[18, "year"], Any[18, "stint"], Any[18, "team id"], Any[18, "league id"], Any[18, "w"], Any[18, "l"], Any[18, "g"], Any[18, "gs"], Any[18, "cg"], Any[18, "sho"], Any[18, "sv"], Any[18, "ipouts"], Any[18, "h"], Any[18, "er"], Any[18, "hr"], Any[18, "bb"], Any[18, "so"], Any[18, "baopp"], Any[18, "era"], Any[18, "ibb"], Any[18, "wp"], Any[18, "hbp"], Any[18, "bk"], Any[18, "bfp"], Any[18, "gf"], Any[18, "r"], Any[18, "sh"], Any[18, "sf"], Any[18, "g idp"], Any[19, "player id"], Any[19, "year"], Any[19, "round"], Any[19, "team id"], Any[19, "league id"], Any[19, "w"], Any[19, "l"], Any[19, "g"], Any[19, "gs"], Any[19, "cg"], Any[19, "sho"], Any[19, "sv"], Any[19, "ipouts"], Any[19, "h"], Any[19, "er"], Any[19, "hr"], Any[19, "bb"], Any[19, "so"], Any[19, "baopp"], Any[19, "era"], Any[19, "ibb"], Any[19, "wp"], Any[19, "hbp"], Any[19, "bk"], Any[19, "bfp"], Any[19, "gf"], Any[19, "r"], Any[19, "sh"], Any[19, "sf"], Any[19, "g idp"], Any[20, "year"], Any[20, "team id"], Any[20, "league id"], Any[20, "player id"], Any[20, "salary"], Any[21, "college id"], Any[21, "name full"], Any[21, "city"], Any[21, "state"], Any[21, "country"], Any[22, "year"], Any[22, "round"], Any[22, "team id winner"], Any[22, "league id winner"], Any[22, "team id loser"], Any[22, "league id loser"], Any[22, "wins"], Any[22, "losses"], Any[22, "ties"], Any[23, "year"], Any[23, "league id"], Any[23, "team id"], Any[23, "franchise id"], Any[23, "div id"], Any[23, "rank"], Any[23, "g"], Any[23, "ghome"], Any[23, "w"], Any[23, "l"], Any[23, "div win"], Any[23, "wc win"], Any[23, "lg win"], Any[23, "ws win"], Any[23, "r"], Any[23, "ab"], Any[23, "h"], Any[23, "double"], Any[23, "triple"], Any[23, "hr"], Any[23, "bb"], Any[23, "so"], Any[23, "sb"], Any[23, "cs"], Any[23, "hbp"], Any[23, "sf"], Any[23, "ra"], Any[23, "er"], Any[23, "era"], Any[23, "cg"], Any[23, "sho"], Any[23, "sv"], Any[23, "ipouts"], Any[23, "ha"], Any[23, "hra"], Any[23, "bba"], Any[23, "soa"], Any[23, "e"], Any[23, "dp"], Any[23, "fp"], Any[23, "name"], Any[23, "park"], Any[23, "attendance"], Any[23, "bpf"], Any[23, "ppf"], Any[23, "team id br"], Any[23, "team id lahman45"], Any[23, "team id retro"], Any[24, "franchise id"], Any[24, "franchise name"], Any[24, "active"], Any[24, "na assoc"], Any[25, "year"], Any[25, "league id"], Any[25, "team id"], Any[25, "half"], Any[25, "div id"], Any[25, "div win"], Any[25, "rank"], Any[25, "g"], Any[25, "w"], Any[25, "l"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "player id"], Any[0, "year"], Any[0, "game num"], Any[0, "game id"], Any[0, "team id"], Any[0, "league id"], Any[0, "gp"], Any[0, "starting pos"], Any[1, "year"], Any[1, "team id"], Any[1, "league id"], Any[1, "player id"], Any[1, "g all"], Any[1, "gs"], Any[1, "g batting"], Any[1, "g defense"], Any[1, "g p"], Any[1, "g c"], Any[1, "g 1b"], Any[1, "g 2b"], Any[1, "g 3b"], Any[1, "g ss"], Any[1, "g lf"], Any[1, "g cf"], Any[1, "g rf"], Any[1, "g of"], Any[1, "g dh"], Any[1, "g ph"], Any[1, "g pr"], Any[2, "player id"], Any[2, "award id"], Any[2, "year"], Any[2, "league id"], Any[2, "tie"], Any[2, "notes"], Any[3, "player id"], Any[3, "award id"], Any[3, "year"], Any[3, "league id"], Any[3, "tie"], Any[3, "notes"], Any[4, "award id"], Any[4, "year"], Any[4, "league id"], Any[4, "player id"], Any[4, "points won"], Any[4, "points max"], Any[4, "votes first"], Any[5, "award id"], Any[5, "year"], Any[5, "league id"], Any[5, "player id"], Any[5, "points won"], Any[5, "points max"], Any[5, "votes first"], Any[6, "player id"], Any[6, "year"], Any[6, "stint"], Any[6, "team id"], Any[6, "league id"], Any[6, "g"], Any[6, "ab"], Any[6, "r"], Any[6, "h"], Any[6, "double"], Any[6, "triple"], Any[6, "hr"], Any[6, "rbi"], Any[6, "sb"], Any[6, "cs"], Any[6, "bb"], Any[6, "so"], Any[6, "ibb"], Any[6, "hbp"], Any[6, "sh"], Any[6, "sf"], Any[6, "g idp"], Any[7, "year"], Any[7, "round"], Any[7, "player id"], Any[7, "team id"], Any[7, "league id"], Any[7, "g"], Any[7, "ab"], Any[7, "r"], Any[7, "h"], Any[7, "double"], Any[7, "triple"], Any[7, "hr"], Any[7, "rbi"], Any[7, "sb"], Any[7, "cs"], Any[7, "bb"], Any[7, "so"], Any[7, "ibb"], Any[7, "hbp"], Any[7, "sh"], Any[7, "sf"], Any[7, "g idp"], Any[8, "player id"], Any[8, "college id"], Any[8, "year"], Any[9, "player id"], Any[9, "year"], Any[9, "stint"], Any[9, "team id"], Any[9, "league id"], Any[9, "pos"], Any[9, "g"], Any[9, "gs"], Any[9, "inn outs"], Any[9, "po"], Any[9, "a"], Any[9, "e"], Any[9, "dp"], Any[9, "pb"], Any[9, "wp"], Any[9, "sb"], Any[9, "cs"], Any[9, "zr"], Any[10, "player id"], Any[10, "year"], Any[10, "stint"], Any[10, "glf"], Any[10, "gcf"], Any[10, "grf"], Any[11, "player id"], Any[11, "year"], Any[11, "team id"], Any[11, "league id"], Any[11, "round"], Any[11, "pos"], Any[11, "g"], Any[11, "gs"], Any[11, "inn outs"], Any[11, "po"], Any[11, "a"], Any[11, "e"], Any[11, "dp"], Any[11, "tp"], Any[11, "pb"], Any[11, "sb"], Any[11, "cs"], Any[12, "player id"], Any[12, "yearid"], Any[12, "votedby"], Any[12, "ballots"], Any[12, "needed"], Any[12, "votes"], Any[12, "inducted"], Any[12, "category"], Any[12, "needed note"], Any[13, "year"], Any[13, "league id"], Any[13, "team id"], Any[13, "park id"], Any[13, "span first"], Any[13, "span last"], Any[13, "games"], Any[13, "openings"], Any[13, "attendance"], Any[14, "player id"], Any[14, "year"], Any[14, "team id"], Any[14, "league id"], Any[14, "inseason"], Any[14, "g"], Any[14, "w"], Any[14, "l"], Any[14, "rank"], Any[14, "plyr mgr"], Any[15, "player id"], Any[15, "year"], Any[15, "team id"], Any[15, "league id"], Any[15, "inseason"], Any[15, "half"], Any[15, "g"], Any[15, "w"], Any[15, "l"], Any[15, "rank"], Any[16, "player id"], Any[16, "birth year"], Any[16, "birth month"], Any[16, "birth day"], Any[16, "birth country"], Any[16, "birth state"], Any[16, "birth city"], Any[16, "death year"], Any[16, "death month"], Any[16, "death day"], Any[16, "death country"], Any[16, "death state"], Any[16, "death city"], Any[16, "name first"], Any[16, "name last"], Any[16, "name given"], Any[16, "weight"], Any[16, "height"], Any[16, "bats"], Any[16, "throws"], Any[16, "debut"], Any[16, "final game"], Any[16, "retro id"], Any[16, "bbref id"], Any[17, "park id"], Any[17, "park name"], Any[17, "park alias"], Any[17, "city"], Any[17, "state"], Any[17, "country"], Any[18, "player id"], Any[18, "year"], Any[18, "stint"], Any[18, "team id"], Any[18, "league id"], Any[18, "w"], Any[18, "l"], Any[18, "g"], Any[18, "gs"], Any[18, "cg"], Any[18, "sho"], Any[18, "sv"], Any[18, "ipouts"], Any[18, "h"], Any[18, "er"], Any[18, "hr"], Any[18, "bb"], Any[18, "so"], Any[18, "baopp"], Any[18, "era"], Any[18, "ibb"], Any[18, "wp"], Any[18, "hbp"], Any[18, "bk"], Any[18, "bfp"], Any[18, "gf"], Any[18, "r"], Any[18, "sh"], Any[18, "sf"], Any[18, "g idp"], Any[19, "player id"], Any[19, "year"], Any[19, "round"], Any[19, "team id"], Any[19, "league id"], Any[19, "w"], Any[19, "l"], Any[19, "g"], Any[19, "gs"], Any[19, "cg"], Any[19, "sho"], Any[19, "sv"], Any[19, "ipouts"], Any[19, "h"], Any[19, "er"], Any[19, "hr"], Any[19, "bb"], Any[19, "so"], Any[19, "baopp"], Any[19, "era"], Any[19, "ibb"], Any[19, "wp"], Any[19, "hbp"], Any[19, "bk"], Any[19, "bfp"], Any[19, "gf"], Any[19, "r"], Any[19, "sh"], Any[19, "sf"], Any[19, "g idp"], Any[20, "year"], Any[20, "team id"], Any[20, "league id"], Any[20, "player id"], Any[20, "salary"], Any[21, "college id"], Any[21, "name full"], Any[21, "city"], Any[21, "state"], Any[21, "country"], Any[22, "year"], Any[22, "round"], Any[22, "team id winner"], Any[22, "league id winner"], Any[22, "team id loser"], Any[22, "league id loser"], Any[22, "wins"], Any[22, "losses"], Any[22, "ties"], Any[23, "year"], Any[23, "league id"], Any[23, "team id"], Any[23, "franchise id"], Any[23, "div id"], Any[23, "rank"], Any[23, "g"], Any[23, "ghome"], Any[23, "w"], Any[23, "l"], Any[23, "div win"], Any[23, "wc win"], Any[23, "lg win"], Any[23, "ws win"], Any[23, "r"], Any[23, "ab"], Any[23, "h"], Any[23, "double"], Any[23, "triple"], Any[23, "hr"], Any[23, "bb"], Any[23, "so"], Any[23, "sb"], Any[23, "cs"], Any[23, "hbp"], Any[23, "sf"], Any[23, "ra"], Any[23, "er"], Any[23, "era"], Any[23, "cg"], Any[23, "sho"], Any[23, "sv"], Any[23, "ipouts"], Any[23, "ha"], Any[23, "hra"], Any[23, "bba"], Any[23, "soa"], Any[23, "e"], Any[23, "dp"], Any[23, "fp"], Any[23, "name"], Any[23, "park"], Any[23, "attendance"], Any[23, "bpf"], Any[23, "ppf"], Any[23, "team id br"], Any[23, "team id lahman45"], Any[23, "team id retro"], Any[24, "franchise id"], Any[24, "franchise name"], Any[24, "active"], Any[24, "na assoc"], Any[25, "year"], Any[25, "league id"], Any[25, "team id"], Any[25, "half"], Any[25, "div id"], Any[25, "div win"], Any[25, "rank"], Any[25, "g"], Any[25, "w"], Any[25, "l"]]))
+            push!(omitted, dirty_name)
+        end
+    end
+end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+
 ## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[-1, "*"], Any[0, "player id"], Any[0, "year"], Any[0, "game num"], Any[0, "game id"], Any[0, "team id"], Any[0, "league id"], Any[0, "gp"], Any[0, "starting pos"], Any[1, "year"], Any[1, "team id"], Any[1, "league id"], Any[1, "player id"], Any[1, "g all"], Any[1, "gs"], Any[1, "g batting"], Any[1, "g defense"], Any[1, "g p"], Any[1, "g c"], Any[1, "g 1b"], Any[1, "g 2b"], Any[1, "g 3b"], Any[1, "g ss"], Any[1, "g lf"], Any[1, "g cf"], Any[1, "g rf"], Any[1, "g of"], Any[1, "g dh"], Any[1, "g ph"], Any[1, "g pr"], Any[2, "player id"], Any[2, "award id"], Any[2, "year"], Any[2, "league id"], Any[2, "tie"], Any[2, "notes"], Any[3, "player id"], Any[3, "award id"], Any[3, "year"], Any[3, "league id"], Any[3, "tie"], Any[3, "notes"], Any[4, "award id"], Any[4, "year"], Any[4, "league id"], Any[4, "player id"], Any[4, "points won"], Any[4, "points max"], Any[4, "votes first"], Any[5, "award id"], Any[5, "year"], Any[5, "league id"], Any[5, "player id"], Any[5, "points won"], Any[5, "points max"], Any[5, "votes first"], Any[6, "player id"], Any[6, "year"], Any[6, "stint"], Any[6, "team id"], Any[6, "league id"], Any[6, "g"], Any[6, "ab"], Any[6, "r"], Any[6, "h"], Any[6, "double"], Any[6, "triple"], Any[6, "hr"], Any[6, "rbi"], Any[6, "sb"], Any[6, "cs"], Any[6, "bb"], Any[6, "so"], Any[6, "ibb"], Any[6, "hbp"], Any[6, "sh"], Any[6, "sf"], Any[6, "g idp"], Any[7, "year"], Any[7, "round"], Any[7, "player id"], Any[7, "team id"], Any[7, "league id"], Any[7, "g"], Any[7, "ab"], Any[7, "r"], Any[7, "h"], Any[7, "double"], Any[7, "triple"], Any[7, "hr"], Any[7, "rbi"], Any[7, "sb"], Any[7, "cs"], Any[7, "bb"], Any[7, "so"], Any[7, "ibb"], Any[7, "hbp"], Any[7, "sh"], Any[7, "sf"], Any[7, "g idp"], Any[8, "player id"], Any[8, "college id"], Any[8, "year"], Any[9, "player id"], Any[9, "year"], Any[9, "stint"], Any[9, "team id"], Any[9, "league id"], Any[9, "pos"], Any[9, "g"], Any[9, "gs"], Any[9, "inn outs"], Any[9, "po"], Any[9, "a"], Any[9, "e"], Any[9, "dp"], Any[9, "pb"], Any[9, "wp"], Any[9, "sb"], Any[9, "cs"], Any[9, "zr"], Any[10, "player id"], Any[10, "year"], Any[10, "stint"], Any[10, "glf"], Any[10, "gcf"], Any[10, "grf"], Any[11, "player id"], Any[11, "year"], Any[11, "team id"], Any[11, "league id"], Any[11, "round"], Any[11, "pos"], Any[11, "g"], Any[11, "gs"], Any[11, "inn outs"], Any[11, "po"], Any[11, "a"], Any[11, "e"], Any[11, "dp"], Any[11, "tp"], Any[11, "pb"], Any[11, "sb"], Any[11, "cs"], Any[12, "player id"], Any[12, "yearid"], Any[12, "votedby"], Any[12, "ballots"], Any[12, "needed"], Any[12, "votes"], Any[12, "inducted"], Any[12, "category"], Any[12, "needed note"], Any[13, "year"], Any[13, "league id"], Any[13, "team id"], Any[13, "park id"], Any[13, "span first"], Any[13, "span last"], Any[13, "games"], Any[13, "openings"], Any[13, "attendance"], Any[14, "player id"], Any[14, "year"], Any[14, "team id"], Any[14, "league id"], Any[14, "inseason"], Any[14, "g"], Any[14, "w"], Any[14, "l"], Any[14, "rank"], Any[14, "plyr mgr"], Any[15, "player id"], Any[15, "year"], Any[15, "team id"], Any[15, "league id"], Any[15, "inseason"], Any[15, "half"], Any[15, "g"], Any[15, "w"], Any[15, "l"], Any[15, "rank"], Any[16, "player id"], Any[16, "birth year"], Any[16, "birth month"], Any[16, "birth day"], Any[16, "birth country"], Any[16, "birth state"], Any[16, "birth city"], Any[16, "death year"], Any[16, "death month"], Any[16, "death day"], Any[16, "death country"], Any[16, "death state"], Any[16, "death city"], Any[16, "name first"], Any[16, "name last"], Any[16, "name given"], Any[16, "weight"], Any[16, "height"], Any[16, "bats"], Any[16, "throws"], Any[16, "debut"], Any[16, "final game"], Any[16, "retro id"], Any[16, "bbref id"], Any[17, "park id"], Any[17, "park name"], Any[17, "park alias"], Any[17, "city"], Any[17, "state"], Any[17, "country"], Any[18, "player id"], Any[18, "year"], Any[18, "stint"], Any[18, "team id"], Any[18, "league id"], Any[18, "w"], Any[18, "l"], Any[18, "g"], Any[18, "gs"], Any[18, "cg"], Any[18, "sho"], Any[18, "sv"], Any[18, "ipouts"], Any[18, "h"], Any[18, "er"], Any[18, "hr"], Any[18, "bb"], Any[18, "so"], Any[18, "baopp"], Any[18, "era"], Any[18, "ibb"], Any[18, "wp"], Any[18, "hbp"], Any[18, "bk"], Any[18, "bfp"], Any[18, "gf"], Any[18, "r"], Any[18, "sh"], Any[18, "sf"], Any[18, "g idp"], Any[19, "player id"], Any[19, "year"], Any[19, "round"], Any[19, "team id"], Any[19, "league id"], Any[19, "w"], Any[19, "l"], Any[19, "g"], Any[19, "gs"], Any[19, "cg"], Any[19, "sho"], Any[19, "sv"], Any[19, "ipouts"], Any[19, "h"], Any[19, "er"], Any[19, "hr"], Any[19, "bb"], Any[19, "so"], Any[19, "baopp"], Any[19, "era"], Any[19, "ibb"], Any[19, "wp"], Any[19, "hbp"], Any[19, "bk"], Any[19, "bfp"], Any[19, "gf"], Any[19, "r"], Any[19, "sh"], Any[19, "sf"], Any[19, "g idp"], Any[20, "year"], Any[20, "team id"], Any[20, "league id"], Any[20, "player id"], Any[20, "salary"], Any[21, "college id"], Any[21, "name full"], Any[21, "city"], Any[21, "state"], Any[21, "country"], Any[22, "year"], Any[22, "round"], Any[22, "team id winner"], Any[22, "league id winner"], Any[22, "team id loser"], Any[22, "league id loser"], Any[22, "wins"], Any[22, "losses"], Any[22, "ties"], Any[23, "year"], Any[23, "league id"], Any[23, "team id"], Any[23, "franchise id"], Any[23, "div id"], Any[23, "rank"], Any[23, "g"], Any[23, "ghome"], Any[23, "w"], Any[23, "l"], Any[23, "div win"], Any[23, "wc win"], Any[23, "lg win"], Any[23, "ws win"], Any[23, "r"], Any[23, "ab"], Any[23, "h"], Any[23, "double"], Any[23, "triple"], Any[23, "hr"], Any[23, "bb"], Any[23, "so"], Any[23, "sb"], Any[23, "cs"], Any[23, "hbp"], Any[23, "sf"], Any[23, "ra"], Any[23, "er"], Any[23, "era"], Any[23, "cg"], Any[23, "sho"], Any[23, "sv"], Any[23, "ipouts"], Any[23, "ha"], Any[23, "hra"], Any[23, "bba"], Any[23, "soa"], Any[23, "e"], Any[23, "dp"], Any[23, "fp"], Any[23, "name"], Any[23, "park"], Any[23, "attendance"], Any[23, "bpf"], Any[23, "ppf"], Any[23, "team id br"], Any[23, "team id lahman45"], Any[23, "team id retro"], Any[24, "franchise id"], Any[24, "franchise name"], Any[24, "active"], Any[24, "na assoc"], Any[25, "year"], Any[25, "league id"], Any[25, "team id"], Any[25, "half"], Any[25, "div id"], Any[25, "div win"], Any[25, "rank"], Any[25, "g"], Any[25, "w"], Any[25, "l"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[-1, "*"], Any[0, "player id"], Any[0, "year"], Any[0, "game num"], Any[0, "game id"], Any[0, "team id"], Any[0, "league id"], Any[0, "gp"], Any[0, "starting pos"], Any[1, "year"], Any[1, "team id"], Any[1, "league id"], Any[1, "player id"], Any[1, "g all"], Any[1, "gs"], Any[1, "g batting"], Any[1, "g defense"], Any[1, "g p"], Any[1, "g c"], Any[1, "g 1b"], Any[1, "g 2b"], Any[1, "g 3b"], Any[1, "g ss"], Any[1, "g lf"], Any[1, "g cf"], Any[1, "g rf"], Any[1, "g of"], Any[1, "g dh"], Any[1, "g ph"], Any[1, "g pr"], Any[2, "player id"], Any[2, "award id"], Any[2, "year"], Any[2, "league id"], Any[2, "tie"], Any[2, "notes"], Any[3, "player id"], Any[3, "award id"], Any[3, "year"], Any[3, "league id"], Any[3, "tie"], Any[3, "notes"], Any[4, "award id"], Any[4, "year"], Any[4, "league id"], Any[4, "player id"], Any[4, "points won"], Any[4, "points max"], Any[4, "votes first"], Any[5, "award id"], Any[5, "year"], Any[5, "league id"], Any[5, "player id"], Any[5, "points won"], Any[5, "points max"], Any[5, "votes first"], Any[6, "player id"], Any[6, "year"], Any[6, "stint"], Any[6, "team id"], Any[6, "league id"], Any[6, "g"], Any[6, "ab"], Any[6, "r"], Any[6, "h"], Any[6, "double"], Any[6, "triple"], Any[6, "hr"], Any[6, "rbi"], Any[6, "sb"], Any[6, "cs"], Any[6, "bb"], Any[6, "so"], Any[6, "ibb"], Any[6, "hbp"], Any[6, "sh"], Any[6, "sf"], Any[6, "g idp"], Any[7, "year"], Any[7, "round"], Any[7, "player id"], Any[7, "team id"], Any[7, "league id"], Any[7, "g"], Any[7, "ab"], Any[7, "r"], Any[7, "h"], Any[7, "double"], Any[7, "triple"], Any[7, "hr"], Any[7, "rbi"], Any[7, "sb"], Any[7, "cs"], Any[7, "bb"], Any[7, "so"], Any[7, "ibb"], Any[7, "hbp"], Any[7, "sh"], Any[7, "sf"], Any[7, "g idp"], Any[8, "player id"], Any[8, "college id"], Any[8, "year"], Any[9, "player id"], Any[9, "year"], Any[9, "stint"], Any[9, "team id"], Any[9, "league id"], Any[9, "pos"], Any[9, "g"], Any[9, "gs"], Any[9, "inn outs"], Any[9, "po"], Any[9, "a"], Any[9, "e"], Any[9, "dp"], Any[9, "pb"], Any[9, "wp"], Any[9, "sb"], Any[9, "cs"], Any[9, "zr"], Any[10, "player id"], Any[10, "year"], Any[10, "stint"], Any[10, "glf"], Any[10, "gcf"], Any[10, "grf"], Any[11, "player id"], Any[11, "year"], Any[11, "team id"], Any[11, "league id"], Any[11, "round"], Any[11, "pos"], Any[11, "g"], Any[11, "gs"], Any[11, "inn outs"], Any[11, "po"], Any[11, "a"], Any[11, "e"], Any[11, "dp"], Any[11, "tp"], Any[11, "pb"], Any[11, "sb"], Any[11, "cs"], Any[12, "player id"], Any[12, "yearid"], Any[12, "votedby"], Any[12, "ballots"], Any[12, "needed"], Any[12, "votes"], Any[12, "inducted"], Any[12, "category"], Any[12, "needed note"], Any[13, "year"], Any[13, "league id"], Any[13, "team id"], Any[13, "park id"], Any[13, "span first"], Any[13, "span last"], Any[13, "games"], Any[13, "openings"], Any[13, "attendance"], Any[14, "player id"], Any[14, "year"], Any[14, "team id"], Any[14, "league id"], Any[14, "inseason"], Any[14, "g"], Any[14, "w"], Any[14, "l"], Any[14, "rank"], Any[14, "plyr mgr"], Any[15, "player id"], Any[15, "year"], Any[15, "team id"], Any[15, "league id"], Any[15, "inseason"], Any[15, "half"], Any[15, "g"], Any[15, "w"], Any[15, "l"], Any[15, "rank"], Any[16, "player id"], Any[16, "birth year"], Any[16, "birth month"], Any[16, "birth day"], Any[16, "birth country"], Any[16, "birth state"], Any[16, "birth city"], Any[16, "death year"], Any[16, "death month"], Any[16, "death day"], Any[16, "death country"], Any[16, "death state"], Any[16, "death city"], Any[16, "name first"], Any[16, "name last"], Any[16, "name given"], Any[16, "weight"], Any[16, "height"], Any[16, "bats"], Any[16, "throws"], Any[16, "debut"], Any[16, "final game"], Any[16, "retro id"], Any[16, "bbref id"], Any[17, "park id"], Any[17, "park name"], Any[17, "park alias"], Any[17, "city"], Any[17, "state"], Any[17, "country"], Any[18, "player id"], Any[18, "year"], Any[18, "stint"], Any[18, "team id"], Any[18, "league id"], Any[18, "w"], Any[18, "l"], Any[18, "g"], Any[18, "gs"], Any[18, "cg"], Any[18, "sho"], Any[18, "sv"], Any[18, "ipouts"], Any[18, "h"], Any[18, "er"], Any[18, "hr"], Any[18, "bb"], Any[18, "so"], Any[18, "baopp"], Any[18, "era"], Any[18, "ibb"], Any[18, "wp"], Any[18, "hbp"], Any[18, "bk"], Any[18, "bfp"], Any[18, "gf"], Any[18, "r"], Any[18, "sh"], Any[18, "sf"], Any[18, "g idp"], Any[19, "player id"], Any[19, "year"], Any[19, "round"], Any[19, "team id"], Any[19, "league id"], Any[19, "w"], Any[19, "l"], Any[19, "g"], Any[19, "gs"], Any[19, "cg"], Any[19, "sho"], Any[19, "sv"], Any[19, "ipouts"], Any[19, "h"], Any[19, "er"], Any[19, "hr"], Any[19, "bb"], Any[19, "so"], Any[19, "baopp"], Any[19, "era"], Any[19, "ibb"], Any[19, "wp"], Any[19, "hbp"], Any[19, "bk"], Any[19, "bfp"], Any[19, "gf"], Any[19, "r"], Any[19, "sh"], Any[19, "sf"], Any[19, "g idp"], Any[20, "year"], Any[20, "team id"], Any[20, "league id"], Any[20, "player id"], Any[20, "salary"], Any[21, "college id"], Any[21, "name full"], Any[21, "city"], Any[21, "state"], Any[21, "country"], Any[22, "year"], Any[22, "round"], Any[22, "team id winner"], Any[22, "league id winner"], Any[22, "team id loser"], Any[22, "league id loser"], Any[22, "wins"], Any[22, "losses"], Any[22, "ties"], Any[23, "year"], Any[23, "league id"], Any[23, "team id"], Any[23, "franchise id"], Any[23, "div id"], Any[23, "rank"], Any[23, "g"], Any[23, "ghome"], Any[23, "w"], Any[23, "l"], Any[23, "div win"], Any[23, "wc win"], Any[23, "lg win"], Any[23, "ws win"], Any[23, "r"], Any[23, "ab"], Any[23, "h"], Any[23, "double"], Any[23, "triple"], Any[23, "hr"], Any[23, "bb"], Any[23, "so"], Any[23, "sb"], Any[23, "cs"], Any[23, "hbp"], Any[23, "sf"], Any[23, "ra"], Any[23, "er"], Any[23, "era"], Any[23, "cg"], Any[23, "sho"], Any[23, "sv"], Any[23, "ipouts"], Any[23, "ha"], Any[23, "hra"], Any[23, "bba"], Any[23, "soa"], Any[23, "e"], Any[23, "dp"], Any[23, "fp"], Any[23, "name"], Any[23, "park"], Any[23, "attendance"], Any[23, "bpf"], Any[23, "ppf"], Any[23, "team id br"], Any[23, "team id lahman45"], Any[23, "team id retro"], Any[24, "franchise id"], Any[24, "franchise name"], Any[24, "active"], Any[24, "na assoc"], Any[25, "year"], Any[25, "league id"], Any[25, "team id"], Any[25, "half"], Any[25, "div id"], Any[25, "div win"], Any[25, "rank"], Any[25, "g"], Any[25, "w"], Any[25, "l"]]), names(dirty_table)))
+foreign_keys = ["player id", "player id", "team id", "player id", "player id", "player id", "player id", "team id", "player id", "college id", "player id", "player id", "player id", "player id", "player id", "park id", "team id", "team id", "team id"]
+column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "year"], Any[0, "game num"], Any[0, "game id"], Any[0, "league id"], Any[0, "gp"], Any[0, "starting pos"], Any[1, "year"], Any[1, "league id"], Any[1, "g all"], Any[1, "gs"], Any[1, "g batting"], Any[1, "g defense"], Any[1, "g p"], Any[1, "g c"], Any[1, "g 1b"], Any[1, "g 2b"], Any[1, "g 3b"], Any[1, "g ss"], Any[1, "g lf"], Any[1, "g cf"], Any[1, "g rf"], Any[1, "g of"], Any[1, "g dh"], Any[1, "g ph"], Any[1, "g pr"], Any[2, "award id"], Any[2, "year"], Any[2, "league id"], Any[2, "tie"], Any[2, "notes"], Any[3, "award id"], Any[3, "year"], Any[3, "league id"], Any[3, "tie"], Any[3, "notes"], Any[4, "award id"], Any[4, "year"], Any[4, "league id"], Any[4, "points won"], Any[4, "points max"], Any[4, "votes first"], Any[5, "award id"], Any[5, "year"], Any[5, "league id"], Any[5, "points won"], Any[5, "points max"], Any[5, "votes first"], Any[6, "year"], Any[6, "stint"], Any[6, "league id"], Any[6, "g"], Any[6, "ab"], Any[6, "r"], Any[6, "h"], Any[6, "double"], Any[6, "triple"], Any[6, "hr"], Any[6, "rbi"], Any[6, "sb"], Any[6, "cs"], Any[6, "bb"], Any[6, "so"], Any[6, "ibb"], Any[6, "hbp"], Any[6, "sh"], Any[6, "sf"], Any[6, "g idp"], Any[7, "year"], Any[7, "round"], Any[7, "league id"], Any[7, "g"], Any[7, "ab"], Any[7, "r"], Any[7, "h"], Any[7, "double"], Any[7, "triple"], Any[7, "hr"], Any[7, "rbi"], Any[7, "sb"], Any[7, "cs"], Any[7, "bb"], Any[7, "so"], Any[7, "ibb"], Any[7, "hbp"], Any[7, "sh"], Any[7, "sf"], Any[7, "g idp"], Any[8, "year"], Any[9, "year"], Any[9, "stint"], Any[9, "league id"], Any[9, "pos"], Any[9, "g"], Any[9, "gs"], Any[9, "inn outs"], Any[9, "po"], Any[9, "a"], Any[9, "e"], Any[9, "dp"], Any[9, "pb"], Any[9, "wp"], Any[9, "sb"], Any[9, "cs"], Any[9, "zr"], Any[10, "year"], Any[10, "stint"], Any[10, "glf"], Any[10, "gcf"], Any[10, "grf"], Any[11, "year"], Any[11, "league id"], Any[11, "round"], Any[11, "pos"], Any[11, "g"], Any[11, "gs"], Any[11, "inn outs"], Any[11, "po"], Any[11, "a"], Any[11, "e"], Any[11, "dp"], Any[11, "tp"], Any[11, "pb"], Any[11, "sb"], Any[11, "cs"], Any[12, "yearid"], Any[12, "votedby"], Any[12, "ballots"], Any[12, "needed"], Any[12, "votes"], Any[12, "inducted"], Any[12, "category"], Any[12, "needed note"], Any[13, "year"], Any[13, "league id"], Any[13, "span first"], Any[13, "span last"], Any[13, "games"], Any[13, "openings"], Any[13, "attendance"], Any[14, "year"], Any[14, "league id"], Any[14, "inseason"], Any[14, "g"], Any[14, "w"], Any[14, "l"], Any[14, "rank"], Any[14, "plyr mgr"], Any[15, "year"], Any[15, "league id"], Any[15, "inseason"], Any[15, "half"], Any[15, "g"], Any[15, "w"], Any[15, "l"], Any[15, "rank"], Any[16, "birth year"], Any[16, "birth month"], Any[16, "birth day"], Any[16, "birth country"], Any[16, "birth state"], Any[16, "birth city"], Any[16, "death year"], Any[16, "death month"], Any[16, "death day"], Any[16, "death country"], Any[16, "death state"], Any[16, "death city"], Any[16, "name first"], Any[16, "name last"], Any[16, "name given"], Any[16, "weight"], Any[16, "height"], Any[16, "bats"], Any[16, "throws"], Any[16, "debut"], Any[16, "final game"], Any[16, "retro id"], Any[16, "bbref id"], Any[17, "park name"], Any[17, "park alias"], Any[17, "city"], Any[17, "state"], Any[17, "country"], Any[18, "year"], Any[18, "stint"], Any[18, "league id"], Any[18, "w"], Any[18, "l"], Any[18, "g"], Any[18, "gs"], Any[18, "cg"], Any[18, "sho"], Any[18, "sv"], Any[18, "ipouts"], Any[18, "h"], Any[18, "er"], Any[18, "hr"], Any[18, "bb"], Any[18, "so"], Any[18, "baopp"], Any[18, "era"], Any[18, "ibb"], Any[18, "wp"], Any[18, "hbp"], Any[18, "bk"], Any[18, "bfp"], Any[18, "gf"], Any[18, "r"], Any[18, "sh"], Any[18, "sf"], Any[18, "g idp"], Any[19, "year"], Any[19, "round"], Any[19, "league id"], Any[19, "w"], Any[19, "l"], Any[19, "g"], Any[19, "gs"], Any[19, "cg"], Any[19, "sho"], Any[19, "sv"], Any[19, "ipouts"], Any[19, "h"], Any[19, "er"], Any[19, "hr"], Any[19, "bb"], Any[19, "so"], Any[19, "baopp"], Any[19, "era"], Any[19, "ibb"], Any[19, "wp"], Any[19, "hbp"], Any[19, "bk"], Any[19, "bfp"], Any[19, "gf"], Any[19, "r"], Any[19, "sh"], Any[19, "sf"], Any[19, "g idp"], Any[20, "year"], Any[20, "league id"], Any[20, "salary"], Any[21, "name full"], Any[21, "city"], Any[21, "state"], Any[21, "country"], Any[22, "year"], Any[22, "round"], Any[22, "team id winner"], Any[22, "league id winner"], Any[22, "team id loser"], Any[22, "league id loser"], Any[22, "wins"], Any[22, "losses"], Any[22, "ties"], Any[23, "year"], Any[23, "league id"], Any[23, "franchise id"], Any[23, "div id"], Any[23, "rank"], Any[23, "g"], Any[23, "ghome"], Any[23, "w"], Any[23, "l"], Any[23, "div win"], Any[23, "wc win"], Any[23, "lg win"], Any[23, "ws win"], Any[23, "r"], Any[23, "ab"], Any[23, "h"], Any[23, "double"], Any[23, "triple"], Any[23, "hr"], Any[23, "bb"], Any[23, "so"], Any[23, "sb"], Any[23, "cs"], Any[23, "hbp"], Any[23, "sf"], Any[23, "ra"], Any[23, "er"], Any[23, "era"], Any[23, "cg"], Any[23, "sho"], Any[23, "sv"], Any[23, "ipouts"], Any[23, "ha"], Any[23, "hra"], Any[23, "bba"], Any[23, "soa"], Any[23, "e"], Any[23, "dp"], Any[23, "fp"], Any[23, "name"], Any[23, "park"], Any[23, "attendance"], Any[23, "bpf"], Any[23, "ppf"], Any[23, "team id br"], Any[23, "team id lahman45"], Any[23, "team id retro"], Any[24, "franchise id"], Any[24, "franchise name"], Any[24, "active"], Any[24, "na assoc"], Any[25, "year"], Any[25, "league id"], Any[25, "half"], Any[25, "div id"], Any[25, "div win"], Any[25, "rank"], Any[25, "g"], Any[25, "w"], Any[25, "l"]]
+if length(omitted) == 0 
+    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
+    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+else
+    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
+    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+end
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
-    for col in names(dirty_table)
+    for col in dirty_columns
         if !ismissing(r[col]) 
             push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
         end
@@ -26,59 +48,6 @@ possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
 
 
 PClean.@model Baseball1Model begin
-    @class All_Star begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        game_num ~ ChooseUniformly(possibilities[:game_num])
-        game_id ~ ChooseUniformly(possibilities[:game_id])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        gp ~ ChooseUniformly(possibilities[:gp])
-        starting_pos ~ ChooseUniformly(possibilities[:starting_pos])
-    end
-
-    @class Appearances begin
-        year ~ ChooseUniformly(possibilities[:year])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        g_all ~ ChooseUniformly(possibilities[:g_all])
-        gs ~ ChooseUniformly(possibilities[:gs])
-        g_batting ~ ChooseUniformly(possibilities[:g_batting])
-        g_defense ~ ChooseUniformly(possibilities[:g_defense])
-        g_p ~ ChooseUniformly(possibilities[:g_p])
-        g_c ~ ChooseUniformly(possibilities[:g_c])
-        g_1b ~ ChooseUniformly(possibilities[:g_1b])
-        g_2b ~ ChooseUniformly(possibilities[:g_2b])
-        g_3b ~ ChooseUniformly(possibilities[:g_3b])
-        g_ss ~ ChooseUniformly(possibilities[:g_ss])
-        g_lf ~ ChooseUniformly(possibilities[:g_lf])
-        g_cf ~ ChooseUniformly(possibilities[:g_cf])
-        g_rf ~ ChooseUniformly(possibilities[:g_rf])
-        g_of ~ ChooseUniformly(possibilities[:g_of])
-        g_dh ~ ChooseUniformly(possibilities[:g_dh])
-        g_ph ~ ChooseUniformly(possibilities[:g_ph])
-        g_pr ~ ChooseUniformly(possibilities[:g_pr])
-    end
-
-    @class Manager_Award begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        award_id ~ ChooseUniformly(possibilities[:award_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        tie ~ ChooseUniformly(possibilities[:tie])
-        notes ~ ChooseUniformly(possibilities[:notes])
-    end
-
-    @class Player_Award begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        award_id ~ ChooseUniformly(possibilities[:award_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        tie ~ ChooseUniformly(possibilities[:tie])
-        notes ~ ChooseUniformly(possibilities[:notes])
-    end
-
     @class Manager_Award_Vote begin
         award_id ~ ChooseUniformly(possibilities[:award_id])
         year ~ ChooseUniformly(possibilities[:year])
@@ -87,172 +56,6 @@ PClean.@model Baseball1Model begin
         points_won ~ ChooseUniformly(possibilities[:points_won])
         points_max ~ ChooseUniformly(possibilities[:points_max])
         votes_first ~ ChooseUniformly(possibilities[:votes_first])
-    end
-
-    @class Player_Award_Vote begin
-        award_id ~ ChooseUniformly(possibilities[:award_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        points_won ~ ChooseUniformly(possibilities[:points_won])
-        points_max ~ ChooseUniformly(possibilities[:points_max])
-        votes_first ~ ChooseUniformly(possibilities[:votes_first])
-    end
-
-    @class Batting begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        stint ~ ChooseUniformly(possibilities[:stint])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        g ~ ChooseUniformly(possibilities[:g])
-        ab ~ ChooseUniformly(possibilities[:ab])
-        r ~ ChooseUniformly(possibilities[:r])
-        h ~ ChooseUniformly(possibilities[:h])
-        double ~ ChooseUniformly(possibilities[:double])
-        triple ~ ChooseUniformly(possibilities[:triple])
-        hr ~ ChooseUniformly(possibilities[:hr])
-        rbi ~ ChooseUniformly(possibilities[:rbi])
-        sb ~ ChooseUniformly(possibilities[:sb])
-        cs ~ ChooseUniformly(possibilities[:cs])
-        bb ~ ChooseUniformly(possibilities[:bb])
-        so ~ ChooseUniformly(possibilities[:so])
-        ibb ~ ChooseUniformly(possibilities[:ibb])
-        hbp ~ ChooseUniformly(possibilities[:hbp])
-        sh ~ ChooseUniformly(possibilities[:sh])
-        sf ~ ChooseUniformly(possibilities[:sf])
-        g_idp ~ ChooseUniformly(possibilities[:g_idp])
-    end
-
-    @class Batting_Postseason begin
-        year ~ ChooseUniformly(possibilities[:year])
-        round ~ ChooseUniformly(possibilities[:round])
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        g ~ ChooseUniformly(possibilities[:g])
-        ab ~ ChooseUniformly(possibilities[:ab])
-        r ~ ChooseUniformly(possibilities[:r])
-        h ~ ChooseUniformly(possibilities[:h])
-        double ~ ChooseUniformly(possibilities[:double])
-        triple ~ ChooseUniformly(possibilities[:triple])
-        hr ~ ChooseUniformly(possibilities[:hr])
-        rbi ~ ChooseUniformly(possibilities[:rbi])
-        sb ~ ChooseUniformly(possibilities[:sb])
-        cs ~ ChooseUniformly(possibilities[:cs])
-        bb ~ ChooseUniformly(possibilities[:bb])
-        so ~ ChooseUniformly(possibilities[:so])
-        ibb ~ ChooseUniformly(possibilities[:ibb])
-        hbp ~ ChooseUniformly(possibilities[:hbp])
-        sh ~ ChooseUniformly(possibilities[:sh])
-        sf ~ ChooseUniformly(possibilities[:sf])
-        g_idp ~ ChooseUniformly(possibilities[:g_idp])
-    end
-
-    @class Player_College begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        college_id ~ ChooseUniformly(possibilities[:college_id])
-        year ~ ChooseUniformly(possibilities[:year])
-    end
-
-    @class Fielding begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        stint ~ ChooseUniformly(possibilities[:stint])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        pos ~ ChooseUniformly(possibilities[:pos])
-        g ~ ChooseUniformly(possibilities[:g])
-        gs ~ ChooseUniformly(possibilities[:gs])
-        inn_outs ~ ChooseUniformly(possibilities[:inn_outs])
-        po ~ ChooseUniformly(possibilities[:po])
-        a ~ ChooseUniformly(possibilities[:a])
-        e ~ ChooseUniformly(possibilities[:e])
-        dp ~ ChooseUniformly(possibilities[:dp])
-        pb ~ ChooseUniformly(possibilities[:pb])
-        wp ~ ChooseUniformly(possibilities[:wp])
-        sb ~ ChooseUniformly(possibilities[:sb])
-        cs ~ ChooseUniformly(possibilities[:cs])
-        zr ~ ChooseUniformly(possibilities[:zr])
-    end
-
-    @class Fielding_Outfield begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        stint ~ ChooseUniformly(possibilities[:stint])
-        glf ~ ChooseUniformly(possibilities[:glf])
-        gcf ~ ChooseUniformly(possibilities[:gcf])
-        grf ~ ChooseUniformly(possibilities[:grf])
-    end
-
-    @class Fielding_Postseason begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        round ~ ChooseUniformly(possibilities[:round])
-        pos ~ ChooseUniformly(possibilities[:pos])
-        g ~ ChooseUniformly(possibilities[:g])
-        gs ~ ChooseUniformly(possibilities[:gs])
-        inn_outs ~ ChooseUniformly(possibilities[:inn_outs])
-        po ~ ChooseUniformly(possibilities[:po])
-        a ~ ChooseUniformly(possibilities[:a])
-        e ~ ChooseUniformly(possibilities[:e])
-        dp ~ ChooseUniformly(possibilities[:dp])
-        tp ~ ChooseUniformly(possibilities[:tp])
-        pb ~ ChooseUniformly(possibilities[:pb])
-        sb ~ ChooseUniformly(possibilities[:sb])
-        cs ~ ChooseUniformly(possibilities[:cs])
-    end
-
-    @class Hall_Of_Fame begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        yearid ~ ChooseUniformly(possibilities[:yearid])
-        votedby ~ ChooseUniformly(possibilities[:votedby])
-        ballots ~ ChooseUniformly(possibilities[:ballots])
-        needed ~ ChooseUniformly(possibilities[:needed])
-        votes ~ ChooseUniformly(possibilities[:votes])
-        inducted ~ ChooseUniformly(possibilities[:inducted])
-        category ~ ChooseUniformly(possibilities[:category])
-        needed_note ~ ChooseUniformly(possibilities[:needed_note])
-    end
-
-    @class Home_Game begin
-        year ~ ChooseUniformly(possibilities[:year])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        park_id ~ ChooseUniformly(possibilities[:park_id])
-        span_first ~ ChooseUniformly(possibilities[:span_first])
-        span_last ~ ChooseUniformly(possibilities[:span_last])
-        games ~ ChooseUniformly(possibilities[:games])
-        openings ~ ChooseUniformly(possibilities[:openings])
-        attendance ~ ChooseUniformly(possibilities[:attendance])
-    end
-
-    @class Manager begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        inseason ~ ChooseUniformly(possibilities[:inseason])
-        g ~ ChooseUniformly(possibilities[:g])
-        w ~ ChooseUniformly(possibilities[:w])
-        l ~ ChooseUniformly(possibilities[:l])
-        rank ~ ChooseUniformly(possibilities[:rank])
-        plyr_mgr ~ ChooseUniformly(possibilities[:plyr_mgr])
-    end
-
-    @class Manager_Half begin
-        player_id ~ ChooseUniformly(possibilities[:player_id])
-        year ~ ChooseUniformly(possibilities[:year])
-        team_id ~ ChooseUniformly(possibilities[:team_id])
-        league_id ~ ChooseUniformly(possibilities[:league_id])
-        inseason ~ ChooseUniformly(possibilities[:inseason])
-        half ~ ChooseUniformly(possibilities[:half])
-        g ~ ChooseUniformly(possibilities[:g])
-        w ~ ChooseUniformly(possibilities[:w])
-        l ~ ChooseUniformly(possibilities[:l])
-        rank ~ ChooseUniformly(possibilities[:rank])
     end
 
     @class Player begin
@@ -457,22 +260,7 @@ PClean.@model Baseball1Model begin
     end
 
     @class Obs begin
-        all_Star ~ All_Star
-        appearances ~ Appearances
-        manager_Award ~ Manager_Award
-        player_Award ~ Player_Award
         manager_Award_Vote ~ Manager_Award_Vote
-        player_Award_Vote ~ Player_Award_Vote
-        batting ~ Batting
-        batting_Postseason ~ Batting_Postseason
-        player_College ~ Player_College
-        fielding ~ Fielding
-        fielding_Outfield ~ Fielding_Outfield
-        fielding_Postseason ~ Fielding_Postseason
-        hall_Of_Fame ~ Hall_Of_Fame
-        home_Game ~ Home_Game
-        manager ~ Manager
-        manager_Half ~ Manager_Half
         player ~ Player
         park ~ Park
         pitching ~ Pitching
@@ -483,46 +271,201 @@ PClean.@model Baseball1Model begin
         team ~ Team
         team_Franchise ~ Team_Franchise
         team_Half ~ Team_Half
+        year ~ ChooseUniformly(possibilities[:year])
+        game_num ~ ChooseUniformly(possibilities[:game_num])
+        game_id ~ ChooseUniformly(possibilities[:game_id])
+        team_id ~ ChooseUniformly(possibilities[:team_id])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        gp ~ ChooseUniformly(possibilities[:gp])
+        starting_pos ~ ChooseUniformly(possibilities[:starting_pos])
+        year ~ ChooseUniformly(possibilities[:year])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        g_all ~ ChooseUniformly(possibilities[:g_all])
+        gs ~ ChooseUniformly(possibilities[:gs])
+        g_batting ~ ChooseUniformly(possibilities[:g_batting])
+        g_defense ~ ChooseUniformly(possibilities[:g_defense])
+        g_p ~ ChooseUniformly(possibilities[:g_p])
+        g_c ~ ChooseUniformly(possibilities[:g_c])
+        g_1b ~ ChooseUniformly(possibilities[:g_1b])
+        g_2b ~ ChooseUniformly(possibilities[:g_2b])
+        g_3b ~ ChooseUniformly(possibilities[:g_3b])
+        g_ss ~ ChooseUniformly(possibilities[:g_ss])
+        g_lf ~ ChooseUniformly(possibilities[:g_lf])
+        g_cf ~ ChooseUniformly(possibilities[:g_cf])
+        g_rf ~ ChooseUniformly(possibilities[:g_rf])
+        g_of ~ ChooseUniformly(possibilities[:g_of])
+        g_dh ~ ChooseUniformly(possibilities[:g_dh])
+        g_ph ~ ChooseUniformly(possibilities[:g_ph])
+        g_pr ~ ChooseUniformly(possibilities[:g_pr])
+        award_id ~ ChooseUniformly(possibilities[:award_id])
+        year ~ ChooseUniformly(possibilities[:year])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        tie ~ ChooseUniformly(possibilities[:tie])
+        notes ~ ChooseUniformly(possibilities[:notes])
+        award_id ~ ChooseUniformly(possibilities[:award_id])
+        year ~ ChooseUniformly(possibilities[:year])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        tie ~ ChooseUniformly(possibilities[:tie])
+        notes ~ ChooseUniformly(possibilities[:notes])
+        award_id ~ ChooseUniformly(possibilities[:award_id])
+        year ~ ChooseUniformly(possibilities[:year])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        points_won ~ ChooseUniformly(possibilities[:points_won])
+        points_max ~ ChooseUniformly(possibilities[:points_max])
+        votes_first ~ ChooseUniformly(possibilities[:votes_first])
+        year ~ ChooseUniformly(possibilities[:year])
+        stint ~ ChooseUniformly(possibilities[:stint])
+        team_id ~ ChooseUniformly(possibilities[:team_id])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        g ~ ChooseUniformly(possibilities[:g])
+        ab ~ ChooseUniformly(possibilities[:ab])
+        r ~ ChooseUniformly(possibilities[:r])
+        h ~ ChooseUniformly(possibilities[:h])
+        double ~ ChooseUniformly(possibilities[:double])
+        triple ~ ChooseUniformly(possibilities[:triple])
+        hr ~ ChooseUniformly(possibilities[:hr])
+        rbi ~ ChooseUniformly(possibilities[:rbi])
+        sb ~ ChooseUniformly(possibilities[:sb])
+        cs ~ ChooseUniformly(possibilities[:cs])
+        bb ~ ChooseUniformly(possibilities[:bb])
+        so ~ ChooseUniformly(possibilities[:so])
+        ibb ~ ChooseUniformly(possibilities[:ibb])
+        hbp ~ ChooseUniformly(possibilities[:hbp])
+        sh ~ ChooseUniformly(possibilities[:sh])
+        sf ~ ChooseUniformly(possibilities[:sf])
+        g_idp ~ ChooseUniformly(possibilities[:g_idp])
+        year ~ ChooseUniformly(possibilities[:year])
+        round ~ ChooseUniformly(possibilities[:round])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        g ~ ChooseUniformly(possibilities[:g])
+        ab ~ ChooseUniformly(possibilities[:ab])
+        r ~ ChooseUniformly(possibilities[:r])
+        h ~ ChooseUniformly(possibilities[:h])
+        double ~ ChooseUniformly(possibilities[:double])
+        triple ~ ChooseUniformly(possibilities[:triple])
+        hr ~ ChooseUniformly(possibilities[:hr])
+        rbi ~ ChooseUniformly(possibilities[:rbi])
+        sb ~ ChooseUniformly(possibilities[:sb])
+        cs ~ ChooseUniformly(possibilities[:cs])
+        bb ~ ChooseUniformly(possibilities[:bb])
+        so ~ ChooseUniformly(possibilities[:so])
+        ibb ~ ChooseUniformly(possibilities[:ibb])
+        hbp ~ ChooseUniformly(possibilities[:hbp])
+        sh ~ ChooseUniformly(possibilities[:sh])
+        sf ~ ChooseUniformly(possibilities[:sf])
+        g_idp ~ ChooseUniformly(possibilities[:g_idp])
+        year ~ ChooseUniformly(possibilities[:year])
+        year ~ ChooseUniformly(possibilities[:year])
+        stint ~ ChooseUniformly(possibilities[:stint])
+        team_id ~ ChooseUniformly(possibilities[:team_id])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        pos ~ ChooseUniformly(possibilities[:pos])
+        g ~ ChooseUniformly(possibilities[:g])
+        gs ~ ChooseUniformly(possibilities[:gs])
+        inn_outs ~ ChooseUniformly(possibilities[:inn_outs])
+        po ~ ChooseUniformly(possibilities[:po])
+        a ~ ChooseUniformly(possibilities[:a])
+        e ~ ChooseUniformly(possibilities[:e])
+        dp ~ ChooseUniformly(possibilities[:dp])
+        pb ~ ChooseUniformly(possibilities[:pb])
+        wp ~ ChooseUniformly(possibilities[:wp])
+        sb ~ ChooseUniformly(possibilities[:sb])
+        cs ~ ChooseUniformly(possibilities[:cs])
+        zr ~ ChooseUniformly(possibilities[:zr])
+        year ~ ChooseUniformly(possibilities[:year])
+        stint ~ ChooseUniformly(possibilities[:stint])
+        glf ~ ChooseUniformly(possibilities[:glf])
+        gcf ~ ChooseUniformly(possibilities[:gcf])
+        grf ~ ChooseUniformly(possibilities[:grf])
+        year ~ ChooseUniformly(possibilities[:year])
+        team_id ~ ChooseUniformly(possibilities[:team_id])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        round ~ ChooseUniformly(possibilities[:round])
+        pos ~ ChooseUniformly(possibilities[:pos])
+        g ~ ChooseUniformly(possibilities[:g])
+        gs ~ ChooseUniformly(possibilities[:gs])
+        inn_outs ~ ChooseUniformly(possibilities[:inn_outs])
+        po ~ ChooseUniformly(possibilities[:po])
+        a ~ ChooseUniformly(possibilities[:a])
+        e ~ ChooseUniformly(possibilities[:e])
+        dp ~ ChooseUniformly(possibilities[:dp])
+        tp ~ ChooseUniformly(possibilities[:tp])
+        pb ~ ChooseUniformly(possibilities[:pb])
+        sb ~ ChooseUniformly(possibilities[:sb])
+        cs ~ ChooseUniformly(possibilities[:cs])
+        yearid ~ ChooseUniformly(possibilities[:yearid])
+        votedby ~ ChooseUniformly(possibilities[:votedby])
+        ballots ~ ChooseUniformly(possibilities[:ballots])
+        needed ~ ChooseUniformly(possibilities[:needed])
+        votes ~ ChooseUniformly(possibilities[:votes])
+        inducted ~ ChooseUniformly(possibilities[:inducted])
+        category ~ ChooseUniformly(possibilities[:category])
+        needed_note ~ ChooseUniformly(possibilities[:needed_note])
+        year ~ ChooseUniformly(possibilities[:year])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        span_first ~ ChooseUniformly(possibilities[:span_first])
+        span_last ~ ChooseUniformly(possibilities[:span_last])
+        games ~ ChooseUniformly(possibilities[:games])
+        openings ~ ChooseUniformly(possibilities[:openings])
+        attendance ~ ChooseUniformly(possibilities[:attendance])
+        player_id ~ ChooseUniformly(possibilities[:player_id])
+        year ~ ChooseUniformly(possibilities[:year])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        inseason ~ ChooseUniformly(possibilities[:inseason])
+        g ~ ChooseUniformly(possibilities[:g])
+        w ~ ChooseUniformly(possibilities[:w])
+        l ~ ChooseUniformly(possibilities[:l])
+        rank ~ ChooseUniformly(possibilities[:rank])
+        plyr_mgr ~ ChooseUniformly(possibilities[:plyr_mgr])
+        player_id ~ ChooseUniformly(possibilities[:player_id])
+        year ~ ChooseUniformly(possibilities[:year])
+        league_id ~ ChooseUniformly(possibilities[:league_id])
+        inseason ~ ChooseUniformly(possibilities[:inseason])
+        half ~ ChooseUniformly(possibilities[:half])
+        g ~ ChooseUniformly(possibilities[:g])
+        w ~ ChooseUniformly(possibilities[:w])
+        l ~ ChooseUniformly(possibilities[:l])
+        rank ~ ChooseUniformly(possibilities[:rank])
     end
 end
 
 query = @query Baseball1Model.Obs [
-    all_star_year all_Star.year
-    all_star_game_num all_Star.game_num
-    all_star_game_id all_Star.game_id
-    all_star_team_id all_Star.team_id
-    all_star_league_id all_Star.league_id
-    all_star_gp all_Star.gp
-    all_star_starting_pos all_Star.starting_pos
-    appearances_year appearances.year
-    appearances_league_id appearances.league_id
-    appearances_g_all appearances.g_all
-    appearances_gs appearances.gs
-    appearances_g_batting appearances.g_batting
-    appearances_g_defense appearances.g_defense
-    appearances_g_p appearances.g_p
-    appearances_g_c appearances.g_c
-    appearances_g_1b appearances.g_1b
-    appearances_g_2b appearances.g_2b
-    appearances_g_3b appearances.g_3b
-    appearances_g_ss appearances.g_ss
-    appearances_g_lf appearances.g_lf
-    appearances_g_cf appearances.g_cf
-    appearances_g_rf appearances.g_rf
-    appearances_g_of appearances.g_of
-    appearances_g_dh appearances.g_dh
-    appearances_g_ph appearances.g_ph
-    appearances_g_pr appearances.g_pr
-    manager_award_award_id manager_Award.award_id
-    manager_award_year manager_Award.year
-    manager_award_league_id manager_Award.league_id
-    manager_award_tie manager_Award.tie
-    manager_award_notes manager_Award.notes
-    player_award_award_id player_Award.award_id
-    player_award_year player_Award.year
-    player_award_league_id player_Award.league_id
-    player_award_tie player_Award.tie
-    player_award_notes player_Award.notes
+    all_star_year year
+    all_star_game_num game_num
+    all_star_game_id game_id
+    all_star_team_id team_id
+    all_star_league_id league_id
+    all_star_gp gp
+    all_star_starting_pos starting_pos
+    appearances_year year
+    appearances_league_id league_id
+    appearances_g_all g_all
+    appearances_gs gs
+    appearances_g_batting g_batting
+    appearances_g_defense g_defense
+    appearances_g_p g_p
+    appearances_g_c g_c
+    appearances_g_1b g_1b
+    appearances_g_2b g_2b
+    appearances_g_3b g_3b
+    appearances_g_ss g_ss
+    appearances_g_lf g_lf
+    appearances_g_cf g_cf
+    appearances_g_rf g_rf
+    appearances_g_of g_of
+    appearances_g_dh g_dh
+    appearances_g_ph g_ph
+    appearances_g_pr g_pr
+    manager_award_award_id award_id
+    manager_award_year year
+    manager_award_league_id league_id
+    manager_award_tie tie
+    manager_award_notes notes
+    player_award_award_id award_id
+    player_award_year year
+    player_award_league_id league_id
+    player_award_tie tie
+    player_award_notes notes
     manager_award_vote_award_id manager_Award_Vote.award_id
     manager_award_vote_year manager_Award_Vote.year
     manager_award_vote_league_id manager_Award_Vote.league_id
@@ -530,125 +473,125 @@ query = @query Baseball1Model.Obs [
     manager_award_vote_points_won manager_Award_Vote.points_won
     manager_award_vote_points_max manager_Award_Vote.points_max
     manager_award_vote_votes_first manager_Award_Vote.votes_first
-    player_award_vote_award_id player_Award_Vote.award_id
-    player_award_vote_year player_Award_Vote.year
-    player_award_vote_league_id player_Award_Vote.league_id
-    player_award_vote_points_won player_Award_Vote.points_won
-    player_award_vote_points_max player_Award_Vote.points_max
-    player_award_vote_votes_first player_Award_Vote.votes_first
-    batting_year batting.year
-    batting_stint batting.stint
-    batting_team_id batting.team_id
-    batting_league_id batting.league_id
-    batting_g batting.g
-    batting_ab batting.ab
-    batting_r batting.r
-    batting_h batting.h
-    batting_double batting.double
-    batting_triple batting.triple
-    batting_hr batting.hr
-    batting_rbi batting.rbi
-    batting_sb batting.sb
-    batting_cs batting.cs
-    batting_bb batting.bb
-    batting_so batting.so
-    batting_ibb batting.ibb
-    batting_hbp batting.hbp
-    batting_sh batting.sh
-    batting_sf batting.sf
-    batting_g_idp batting.g_idp
-    batting_postseason_year batting_Postseason.year
-    batting_postseason_round batting_Postseason.round
-    batting_postseason_league_id batting_Postseason.league_id
-    batting_postseason_g batting_Postseason.g
-    batting_postseason_ab batting_Postseason.ab
-    batting_postseason_r batting_Postseason.r
-    batting_postseason_h batting_Postseason.h
-    batting_postseason_double batting_Postseason.double
-    batting_postseason_triple batting_Postseason.triple
-    batting_postseason_hr batting_Postseason.hr
-    batting_postseason_rbi batting_Postseason.rbi
-    batting_postseason_sb batting_Postseason.sb
-    batting_postseason_cs batting_Postseason.cs
-    batting_postseason_bb batting_Postseason.bb
-    batting_postseason_so batting_Postseason.so
-    batting_postseason_ibb batting_Postseason.ibb
-    batting_postseason_hbp batting_Postseason.hbp
-    batting_postseason_sh batting_Postseason.sh
-    batting_postseason_sf batting_Postseason.sf
-    batting_postseason_g_idp batting_Postseason.g_idp
-    player_college_year player_College.year
-    fielding_year fielding.year
-    fielding_stint fielding.stint
-    fielding_team_id fielding.team_id
-    fielding_league_id fielding.league_id
-    fielding_pos fielding.pos
-    fielding_g fielding.g
-    fielding_gs fielding.gs
-    fielding_inn_outs fielding.inn_outs
-    fielding_po fielding.po
-    fielding_a fielding.a
-    fielding_e fielding.e
-    fielding_dp fielding.dp
-    fielding_pb fielding.pb
-    fielding_wp fielding.wp
-    fielding_sb fielding.sb
-    fielding_cs fielding.cs
-    fielding_zr fielding.zr
-    fielding_outfield_year fielding_Outfield.year
-    fielding_outfield_stint fielding_Outfield.stint
-    fielding_outfield_glf fielding_Outfield.glf
-    fielding_outfield_gcf fielding_Outfield.gcf
-    fielding_outfield_grf fielding_Outfield.grf
-    fielding_postseason_year fielding_Postseason.year
-    fielding_postseason_team_id fielding_Postseason.team_id
-    fielding_postseason_league_id fielding_Postseason.league_id
-    fielding_postseason_round fielding_Postseason.round
-    fielding_postseason_pos fielding_Postseason.pos
-    fielding_postseason_g fielding_Postseason.g
-    fielding_postseason_gs fielding_Postseason.gs
-    fielding_postseason_inn_outs fielding_Postseason.inn_outs
-    fielding_postseason_po fielding_Postseason.po
-    fielding_postseason_a fielding_Postseason.a
-    fielding_postseason_e fielding_Postseason.e
-    fielding_postseason_dp fielding_Postseason.dp
-    fielding_postseason_tp fielding_Postseason.tp
-    fielding_postseason_pb fielding_Postseason.pb
-    fielding_postseason_sb fielding_Postseason.sb
-    fielding_postseason_cs fielding_Postseason.cs
-    hall_of_fame_yearid hall_Of_Fame.yearid
-    hall_of_fame_votedby hall_Of_Fame.votedby
-    hall_of_fame_ballots hall_Of_Fame.ballots
-    hall_of_fame_needed hall_Of_Fame.needed
-    hall_of_fame_votes hall_Of_Fame.votes
-    hall_of_fame_inducted hall_Of_Fame.inducted
-    hall_of_fame_category hall_Of_Fame.category
-    hall_of_fame_needed_note hall_Of_Fame.needed_note
-    home_game_year home_Game.year
-    home_game_league_id home_Game.league_id
-    home_game_span_first home_Game.span_first
-    home_game_span_last home_Game.span_last
-    home_game_games home_Game.games
-    home_game_openings home_Game.openings
-    home_game_attendance home_Game.attendance
-    manager_player_id manager.player_id
-    manager_year manager.year
-    manager_league_id manager.league_id
-    manager_inseason manager.inseason
-    manager_g manager.g
-    manager_w manager.w
-    manager_l manager.l
-    manager_rank manager.rank
-    manager_plyr_mgr manager.plyr_mgr
-    manager_half_player_id manager_Half.player_id
-    manager_half_year manager_Half.year
-    manager_half_league_id manager_Half.league_id
-    manager_half_inseason manager_Half.inseason
-    manager_half_half manager_Half.half
-    manager_half_g manager_Half.g
-    manager_half_w manager_Half.w
-    manager_half_l manager_Half.l
-    manager_half_rank manager_Half.rank
+    player_award_vote_award_id award_id
+    player_award_vote_year year
+    player_award_vote_league_id league_id
+    player_award_vote_points_won points_won
+    player_award_vote_points_max points_max
+    player_award_vote_votes_first votes_first
+    batting_year year
+    batting_stint stint
+    batting_team_id team_id
+    batting_league_id league_id
+    batting_g g
+    batting_ab ab
+    batting_r r
+    batting_h h
+    batting_double double
+    batting_triple triple
+    batting_hr hr
+    batting_rbi rbi
+    batting_sb sb
+    batting_cs cs
+    batting_bb bb
+    batting_so so
+    batting_ibb ibb
+    batting_hbp hbp
+    batting_sh sh
+    batting_sf sf
+    batting_g_idp g_idp
+    batting_postseason_year year
+    batting_postseason_round round
+    batting_postseason_league_id league_id
+    batting_postseason_g g
+    batting_postseason_ab ab
+    batting_postseason_r r
+    batting_postseason_h h
+    batting_postseason_double double
+    batting_postseason_triple triple
+    batting_postseason_hr hr
+    batting_postseason_rbi rbi
+    batting_postseason_sb sb
+    batting_postseason_cs cs
+    batting_postseason_bb bb
+    batting_postseason_so so
+    batting_postseason_ibb ibb
+    batting_postseason_hbp hbp
+    batting_postseason_sh sh
+    batting_postseason_sf sf
+    batting_postseason_g_idp g_idp
+    player_college_year year
+    fielding_year year
+    fielding_stint stint
+    fielding_team_id team_id
+    fielding_league_id league_id
+    fielding_pos pos
+    fielding_g g
+    fielding_gs gs
+    fielding_inn_outs inn_outs
+    fielding_po po
+    fielding_a a
+    fielding_e e
+    fielding_dp dp
+    fielding_pb pb
+    fielding_wp wp
+    fielding_sb sb
+    fielding_cs cs
+    fielding_zr zr
+    fielding_outfield_year year
+    fielding_outfield_stint stint
+    fielding_outfield_glf glf
+    fielding_outfield_gcf gcf
+    fielding_outfield_grf grf
+    fielding_postseason_year year
+    fielding_postseason_team_id team_id
+    fielding_postseason_league_id league_id
+    fielding_postseason_round round
+    fielding_postseason_pos pos
+    fielding_postseason_g g
+    fielding_postseason_gs gs
+    fielding_postseason_inn_outs inn_outs
+    fielding_postseason_po po
+    fielding_postseason_a a
+    fielding_postseason_e e
+    fielding_postseason_dp dp
+    fielding_postseason_tp tp
+    fielding_postseason_pb pb
+    fielding_postseason_sb sb
+    fielding_postseason_cs cs
+    hall_of_fame_yearid yearid
+    hall_of_fame_votedby votedby
+    hall_of_fame_ballots ballots
+    hall_of_fame_needed needed
+    hall_of_fame_votes votes
+    hall_of_fame_inducted inducted
+    hall_of_fame_category category
+    hall_of_fame_needed_note needed_note
+    home_game_year year
+    home_game_league_id league_id
+    home_game_span_first span_first
+    home_game_span_last span_last
+    home_game_games games
+    home_game_openings openings
+    home_game_attendance attendance
+    manager_player_id player_id
+    manager_year year
+    manager_league_id league_id
+    manager_inseason inseason
+    manager_g g
+    manager_w w
+    manager_l l
+    manager_rank rank
+    manager_plyr_mgr plyr_mgr
+    manager_half_player_id player_id
+    manager_half_year year
+    manager_half_league_id league_id
+    manager_half_inseason inseason
+    manager_half_half half
+    manager_half_g g
+    manager_half_w w
+    manager_half_l l
+    manager_half_rank rank
     player_id player.player_id
     player_birth_year player.birth_year
     player_birth_month player.birth_month
@@ -830,4 +773,5 @@ config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
     run_inference!(tr, config)
 end
 
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+println(accuracy)
