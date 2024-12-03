@@ -76,10 +76,10 @@ function generate_program2(table_index=1; random=false, custom=nothing, prior_sp
             table = tables[rand(1:length(tables))]
         end
         table_json["table_names"] = map(x -> replace(x, " " => "_"), table_json["table_names"])
-        error_json = JSON.parse("""{}""")
+        error_json = JSON.parse("""{"swaps" : [["name", ["home_town"], "height"]]}""")
         possibilities = JSON.parse("{}")
         # error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
-        # possibilities = Dict([:weight => [100, 200], :height => [68, 72], :killed => [20, 20, 30]])
+        possibilities = Dict([:name => ["100", "200"], :height => [68, 72], :home_town => ["20", "20", "30"]])
         
         # remove foreign keys from error json -- already represented elsewhere
         if "typos" in keys(error_json)
@@ -131,6 +131,10 @@ function generate_program2(table_index=1; random=false, custom=nothing, prior_sp
         swap_possibilities = Dict(c => [swap_possibilities[c]...] for c in keys(swap_possibilities))"""
     end
 
+    subset_size_string = """subset_size = length(dirty_table)
+    dirty_table = first(dirty_table, subset_size)
+    clean_table = first(clean_table, subset_size)"""
+
     return """using PClean
     using CSV
     using DataFrames: DataFrame
@@ -140,6 +144,8 @@ function generate_program2(table_index=1; random=false, custom=nothing, prior_sp
     dirty_table = CSV.File("$(custom_data_file)") |> DataFrame
     clean_table = CSV.File(replace("$(custom_data_file)", "dirty.csv" => "clean.csv")) |> DataFrame
     $(clean_table_modification)
+
+    $(swap_possibilities_str != "" ? "" : subset_size_string)
 
     omitted = []
     if length(names(dirty_table)) != length($(table["column_names"]))
@@ -175,6 +181,8 @@ function generate_program2(table_index=1; random=false, custom=nothing, prior_sp
     $(swap_possibilities_str)
 
     $(units_str)
+
+    $(swap_possibilities_str == "" ? "" : subset_size_string)
 
     PClean.@model $(model_name)Model begin
     $(generate_classes2(table, error_json, possibilities, prior_spec))
@@ -545,7 +553,7 @@ function generate_prior2(table_json, class_index, col_index, error_json, ps, cus
     end
     
     if custom_priors != nothing && (class_index, col_index) in keys(custom_priors)
-        option_number = custom_prior[(class_index, col_index)]
+        option_number = custom_priors[(class_index, col_index)]
         if option_number == 1 
             return "ChooseUniformly(possibilities[:$(formatted_column_name)])"
         elseif option_number == 2

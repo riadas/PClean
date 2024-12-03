@@ -74,9 +74,11 @@ function evaluate_accuracy(dirty_data, clean_data, table, query; verbose=false)
 
       if haskey(cleanmap, colname)
         our_version = ours[cleanmap[colname]]
-        if our_version != dirty[colname]
+        # println(our_version)
+        # println(dirty[colname])
+        if !ismissing(our_version) && !ismissing(dirty[colname]) && our_version != dirty[colname] || !(!ismissing(our_version) && !ismissing(dirty[colname])) && !(ismissing(our_version) && ismissing(dirty[colname]))
           total_changed += 1
-          if our_version == clean[colname]
+          if !ismissing(our_version) && our_version == clean[colname]
             total_cleaned += 1
           elseif verbose
             println("Changed: $(dirty[colname]) -> $our_version instead of $(clean[colname])")

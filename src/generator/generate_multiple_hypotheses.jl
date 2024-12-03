@@ -16,13 +16,13 @@ for benchmark in ["rents", "flights", "hospital"]
     end
     error_json = JSON.parse(split(text, "\n\n")[2])
 
-    custom_data_file = "datasets/$(test_name)_dirty.csv"
+    custom_data_file = "datasets/$(benchmark)_dirty.csv"
     custom = [custom_schema_file, custom_error_file, custom_data_file]
 
     ## remove foreign keys from error json -- already represented elsewhere
     if "typos" in keys(error_json)
-        foreign_keys = map(t -> t[1], table["foreign_keys"])
-        error_json["typos"] = filter(col -> !(findall(tup -> tup[2] == col, table["column_names"])[1] - 1 in foreign_keys), error_json["typos"])
+        foreign_keys = map(t -> t[1], table_json["foreign_keys"])
+        error_json["typos"] = filter(col -> !(findall(tup -> tup[2] == col, table_json["column_names"])[1] - 1 in foreign_keys), error_json["typos"])
     end
 
     # 
@@ -47,23 +47,41 @@ for benchmark in ["rents", "flights", "hospital"]
         end
     end
 
-    if length(class_and_col_index_pairs) > 9
-        bitstring_len = 9
+    if length(class_and_col_index_pairs) > 7
+        bitstring_len = 7
     else
         bitstring_len = length(class_and_col_index_pairs)
     end
 
-    for i in range(1, 2^bitstring_len)
-        bs = reverse(bitstring(i)[end-(bitstring_len - 1):end])
-        prior_spec = Dict()
-        for i in 1:bitstring_len 
-            if bs[i] == "0"
-                val = 1
-            else
-                val = 2
+    for i in range(0, 2^bitstring_len - 1)
+        if bitstring_len == length(class_and_col_index_pairs)
+            bs = reverse(bitstring(i)[end-(bitstring_len - 1):end])
+            prior_spec = Dict()
+            println(bs)
+            for j in 1:bitstring_len 
+                if bs[j] == '0'
+                    val = 1
+                else
+                    val = 2
+                end
+                prior_spec[class_and_col_index_pairs[j]] = val
             end
-            prior_spec[class_and_col_index_pairs[i]] = val
+        else
+            full_length = length(class_and_col_index_pairs)
+            j = rand(1:2^full_length - 1)
+            bs = reverse(bitstring(j)[end-(full_length - 1):end])
+            prior_spec = Dict()
+            for k in 1:full_length
+                if bs[k] == '0'
+                    val = 1
+                else
+                    val = 2
+                end
+                prior_spec[class_and_col_index_pairs[k]] = val
+            end
         end
+        println("prior_spec")
+        println(prior_spec)
         
         # generate program and write to file 
         program = generate_program(custom=custom, prior_spec=prior_spec)

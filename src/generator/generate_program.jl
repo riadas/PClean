@@ -129,6 +129,10 @@ function generate_program(table_index=1; random=false, custom=nothing, prior_spe
         swap_possibilities = Dict(c => [swap_possibilities[c]...] for c in keys(swap_possibilities))"""
     end
 
+    subset_size_string = """subset_size = length(dirty_table)
+    dirty_table = first(dirty_table, subset_size)
+    clean_table = first(clean_table, subset_size)"""
+
     return """using PClean
     using CSV
     using DataFrames: DataFrame
@@ -139,9 +143,7 @@ function generate_program(table_index=1; random=false, custom=nothing, prior_spe
     clean_table = CSV.File(replace("$(custom_data_file)", "dirty.csv" => "clean.csv")) |> DataFrame
     $(clean_table_modification)
 
-    subset_size = length(dirty_table)
-    dirty_table = first(dirty_table, subset_size)
-    clean_table = first(clean_table, subset_size)
+    $(swap_possibilities_str != "" ? "" : subset_size_string)
 
     omitted = []
     if length(names(dirty_table)) != length($(table["column_names"]))
@@ -177,6 +179,8 @@ function generate_program(table_index=1; random=false, custom=nothing, prior_spe
     $(swap_possibilities_str)
 
     $(units_str)
+
+    $(swap_possibilities_str == "" ? "" : subset_size_string)
 
     PClean.@model $(model_name)Model begin
     $(generate_classes(table, error_json, possibilities, prior_spec))
@@ -499,7 +503,7 @@ function generate_prior(table_json, class_index, col_index, error_json, ps, cust
     end
 
     if custom_priors != nothing && (class_index, col_index) in keys(custom_priors)
-        option_number = custom_prior[(class_index, col_index)]
+        option_number = custom_priors[(class_index, col_index)]
         if option_number == 1 
             return "ChooseUniformly(possibilities[:$(formatted_column_name)])"
         elseif option_number == 2
