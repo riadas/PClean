@@ -10,7 +10,7 @@ for benchmark in ["rents", "hospital", "flights"]
                 text = read(f, String)
             end
             # modify subset_size in text and write back to file
-            text = replace(text, "subset_size = length(dirty_table)" => "subset_size = $(subset_size)")
+            text = replace(text, "subset_size = size(dirty_table, 1)" => "subset_size = $(subset_size)")
             open("$(home_directory)/multiple_hypotheses/$(benchmark)/$(filename)", "w") do f 
                 write(f, text)
             end

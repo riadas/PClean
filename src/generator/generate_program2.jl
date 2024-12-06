@@ -131,7 +131,7 @@ function generate_program2(table_index=1; random=false, custom=nothing, prior_sp
         swap_possibilities = Dict(c => [swap_possibilities[c]...] for c in keys(swap_possibilities))"""
     end
 
-    subset_size_string = """subset_size = length(dirty_table)
+    subset_size_string = """subset_size = size(dirty_table, 1)
     dirty_table = first(dirty_table, subset_size)
     clean_table = first(clean_table, subset_size)"""
 

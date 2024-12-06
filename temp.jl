@@ -1,60 +1,117 @@
-using PClean
-using CSV
-using DataFrames: DataFrame
-using Statistics
+Based on the dataset, I'll create a normalized database schema. Here's the JSON schema that follows the specified format:
 
-# data handling
-dirty_table = CSV.File("datasets/rents_dirty.csv") |> DataFrame
-clean_table = CSV.File(replace("datasets/rents_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
+{
+  "db_id": "hospital_quality",
+  "table_names": [
+    "hospital",
+    "measure"
+  ],
+  "column_names": [
+    [0, "provider_number"],
+    [0, "hospital_name"],
+    [0, "address1"],
+    [0, "phone_number"],
+    [0, "hospital_type"],
+    [0, "hospital_owner"],
+    [0, "emergency_service"],
+    [0, "city"],
+    [0, "state"],
+    [0, "zip_code"],
+    [0, "county_name"],
+    [1, "condition"],
+    [1, "measure_code"],
+    [1, "measure_name"],
+    [1, "state_avg"],
+  ],
+  "column_types": [
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text"
+  ],
+  "foreign_keys": [
+  ],
+  "primary_keys": [
+    0,
+    11,
+  ]
+}
 
-## construct possibilities
-column_renaming_dict = Dict(zip(names(dirty_table), map(t -> t[2], Any[Any[0, "id"], Any[0, "room_type"], Any[0, "monthly_rent"], Any[0, "county"], Any[0, "state"]])))
-column_renaming_dict_reverse = Dict(zip(map(t -> t[2], Any[Any[0, "id"], Any[0, "room_type"], Any[0, "monthly_rent"], Any[0, "county"], Any[0, "state"]]), names(dirty_table)))
+Based on the dataset excerpt, I'll create a JSON schema that matches the specified format. Here's the "table.json" content:
 
-possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
-for r in eachrow(dirty_table)
-    for col in names(dirty_table)
-        if !ismissing(r[col]) 
-            push!(possibilities[Symbol(column_renaming_dict[col])], r[col])
-        end
-    end
-end
-possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
+{
+    "db_id": "rental_properties",
+    "table_names": ["location", "rental"],
+    "column_names": [
+        [0, "location_id"],
+        [0, "county"],
+        [0, "state"],
+        [1, "column_id"],
+        [1, "room_type"],
+        [1, "monthly_rent"],
+        [1, "location_id"],
+    ],
+    "column_types": [
+        "number",
+        "text",
+        "text",
+        "number",
+        "text",
+        "number",
+        "number",
+    ],
+    "foreign_keys": [
+        [6, 0],
+    ],
+    "primary_keys": [
+        0,
+        3
+    ]
+}
 
+Based on the error description, I'll create a JSON with the relevant error types:
 
+{
+    "typos": ["county"],
+    "unit_errors": [["monthly_rent", 1000]]
+}
 
-units = [Transformation(x -> x/1.0, x -> x*1.0, x -> 1/1.0), Transformation(x -> x/1000.0, x -> x*1000.0, x -> 1/1000.0)]
+Explanation:
+- The description mentions typos in county names, so "county" is included in the `typos` array.
+- The rent being sometimes reported in thousands of dollars means there's a unit scale error where some values need to be multiplied by 1000 to be consistent, so this is included in `unit_errors`.
+- There's no mention of value swaps between rows, so the `swaps` field is omitted entirely.
+- The missing values mentioned in the description don't fit into any of the three error categories specified in the format, so they're not included in the JSON.
+- The column names used match exactly with those in the schema JSON from earlier.
 
-PClean.@model RentalDataModel begin
-    @class Rental_listings begin
-        room_type ~ ChooseUniformly(possibilities[:room_type])
-        county ~ StringPrior(5, 35, possibilities[:county])
-        state ~ ChooseUniformly(possibilities[:state])
-    end
+Based on the error description, I'll create a JSON with the relevant error types:
 
-    @class Obs begin
-        rental_listings ~ Rental_listings
-        @learned avg_monthly_rent::Dict{String, MeanParameter{2068.443249159866, 1339.4564887947838}}
-        unit ~ ChooseUniformly(units)
-        monthly_rent_base = avg_monthly_rent["$(rental_listings.room_type)_$(rental_listings.county)_$(rental_listings.state)"]
-        monthly_rent_corrected = round(unit.backward(monthly_rent))
-        county ~ AddTypos(rental_listings.county, 2)
-    end
-end
-
-query = @query RentalDataModel.Obs [
-    "Room Type" rental_listings.room_type
-    "Monthly Rent" monthly_rent_corrected monthly_rent
-    County rental_listings.county county
-    State rental_listings.state
-]
-
-
-observations = [ObservedDataset(query, dirty_table)]
-config = PClean.InferenceConfig(1, 2; use_mh_instead_of_pg=true)
-@time begin 
-    tr = initialize_trace(observations, config);
-    run_inference!(tr, config)
-end
-
-println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+{
+    "typos" : [
+      "provider_number",
+       "hospital_name",
+       "address1",
+       "city",
+       "state",
+       "zip_code",
+       "county_name",
+       "phone_number",
+       "hospital_type",
+       "hospital_owner",
+       "emergency_service",
+       "measure_code",
+       "measure_name",
+       "condition",
+       "state_avg"
+    ]
+}
