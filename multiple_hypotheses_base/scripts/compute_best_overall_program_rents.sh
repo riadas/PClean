@@ -4,17 +4,20 @@
 home_dir="/afs/csail.mit.edu/u/r/riadas/phd/PClean"
 methods=("synthesis_from_jsons" "direct_synthesis")
 benchmarks=("rents")
+counter=0
 for method in ${methods[@]}
 do 
     for benchmark in ${benchmarks[@]}; 
     do
-        for filename in "$home_dir/multiple_hypotheses_base/hypotheses_copy/$(method)/$(benchmark)"/*
+        for filename in "$home_dir/multiple_hypotheses_base/hypotheses_copy/$method/$benchmark"/*
         do
             echo new_run
             echo $method
             echo $benchmark
             echo $filename
-            # julia --project=$home_dir $home_dir/multiple_hypotheses_base/scripts/compute_best_overall_program_rents.jl $method $benchmark $filename > "$home_dir/logs/$method_$benchmark_$filename.txt" &
+            echo $counter 
+            counter++
+            julia --project=$home_dir $home_dir/multiple_hypotheses_base/scripts/compute_best_overall_program_rents.jl $method $benchmark $filename > "$home_dir/logs/$method_$benchmark_$counter.txt" &
             sleep 10
         done
     done

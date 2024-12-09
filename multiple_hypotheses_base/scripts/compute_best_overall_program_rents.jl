@@ -19,6 +19,7 @@ for method in [curr_method] #["synthesis_from_jsons"] # ["synthesis_from_jsons",
         # save the results to a file
         results = []
         for filename in [filename] # readdir("$(home_directory)/multiple_hypotheses_base/hypotheses_copy/$(method)/$(benchmark)")
+            filename = split(filename, "/")[end]
             println("compute_overall_best_program: $(benchmark), $(filename)")
             text = ""
             open("$(home_directory)/multiple_hypotheses_base/hypotheses_copy/$(method)/$(benchmark)/$(filename)") do f 
