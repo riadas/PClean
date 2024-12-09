@@ -9,8 +9,8 @@ for method in [curr_method] #["synthesis_from_jsons"] # ["synthesis_from_jsons",
     for benchmark in [curr_benchmark] # ["flights", "hospital", "rents"]
         println("compute_overall_best_program: $(benchmark)")
         if method == "direct_synthesis" && benchmark == "flights"
-            continue
             println("never mind!")
+            continue
         end
 
         # compute f1 scores of each variant and find the max
