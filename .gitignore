@@ -2,7 +2,6 @@ src/generator/generate_program_claude_rents.py
 src/generator/generate_program_claude_flights.py
 src/generator/spider_data
 .DS_Store
-results
 runtimes
 *.png
 *.pyc
