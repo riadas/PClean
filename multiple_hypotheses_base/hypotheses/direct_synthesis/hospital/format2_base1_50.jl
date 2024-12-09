@@ -10,7 +10,7 @@ clean_table[!, :PhoneNumber] = map(x -> "$x", clean_table[!, :PhoneNumber])
 clean_table[!, :ZipCode] = map(x -> "$x", clean_table[!, :ZipCode])
 clean_table[!, :ProviderNumber] = map(x -> "$x", clean_table[!, :ProviderNumber])
 
-subset_size = 100
+subset_size = size(dirty_table, 1)
 dirty_table = first(dirty_table, subset_size)
 clean_table = first(clean_table, subset_size)
 
