@@ -1,4 +1,5 @@
-home_directory = "/Users/riadas/Documents/phd/classes/databases/final_project/PClean"
+# home_directory = "/Users/riadas/Documents/phd/classes/databases/final_project/PClean"
+home_directory = "/afs/csail.mit.edu/u/r/riadas/phd/PClean"
 text = ""
 num_repeats = 3
 
