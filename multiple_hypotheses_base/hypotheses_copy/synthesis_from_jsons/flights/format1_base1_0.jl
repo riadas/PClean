@@ -110,6 +110,3 @@ end
 
 accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
 println(accuracy)
-include("/Users/riadas/Documents/phd/classes/databases/final_project/PClean/src/generator/evaluate_program.jl")
-table = get_table_from_trace(tr.tables[:Obs], query, clean_table, dirty_table)
-CSV.write("/Users/riadas/Documents/phd/classes/databases/final_project/PClean/multiple_hypotheses_base/results/datasets/synthesis_from_jsons/flights/format1_base1_0_1.csv", table)
