@@ -2,6 +2,7 @@ home_directory = "/Users/riadas/Documents/phd/classes/databases/final_project/PC
 using DataStructures
 using StatsBase 
 using Random
+using JSON
 
 function generate_error_json(table_json)
     num_errors = rand(1:3)
@@ -23,10 +24,21 @@ function generate_error_json(table_json)
             columns = filter(tup -> !(tup[2] in error_json["typos"]), columns)
         end
 
+        if "swaps" in keys(error_json)
+            columns = filter(tup -> !(tup[2] in [error_json["swaps"][1][1], error_json["swaps"][1][2][1], error_json["swaps"][1][3]]), columns)
+        end
+
         if error_type == "typo"
-            
-            if "typos" in keys(error_json) 
-                columns = filter(tup -> table_json["column_types"][findall(t -> t == tup, table_json["column_names"])[1]] in ["text", "string"], columns)
+
+            columns = filter(tup -> table_json["column_types"][findall(t -> t == tup, table_json["column_names"])[1]] in ["text", "string"], columns)
+            if length(columns) == 0 
+                continue
+            end
+            if "typos" in keys(error_json)
+                columns = filter(tup -> !(tup[1] in error_json["typos"]), columns)
+                if length(columns) == 0 
+                    continue
+                end
                 column_name = rand(columns)[2]
                 push!(error_json["typos"], column_name)
             else
@@ -37,6 +49,9 @@ function generate_error_json(table_json)
         elseif error_type == "unit_error"
             units = [1000, 100, 10, 2.2, 2.54]
             columns = filter(tup -> !(table_json["column_types"][findall(t -> t == tup, table_json["column_names"])[1]] in ["text", "string", "time"]), columns)
+            if length(columns) == 0 
+                continue
+            end
             column_name = rand(columns)[2]
             unit = rand(units)
             
@@ -50,11 +65,17 @@ function generate_error_json(table_json)
         elseif error_type == "swap"
             table_indices_with_enough_columns = filter(i -> length(filter(tup -> tup[1] == i - 1, columns)) >= 3, 1:length(table_json["table_names"]))
             if length(table_indices_with_enough_columns) != 0 
+                if length(columns) == 0 
+                    continue
+                end
+                if length(table_indices_with_enough_columns) == 0 
+                    continue
+                end
                 table_index = rand(table_indices_with_enough_columns)
                 columns = filter(tup -> tup[1] == table_index - 1, columns)
                 swap_columns = sample(columns, 3, replace = false)
                 swap_columns = shuffle(swap_columns)
-                error_json["swaps"] = [[swap_columns[1], [swap_columns[2]], swap_columns[3]]]
+                error_json["swaps"] = [[swap_columns[1][2], [swap_columns[2][2]], swap_columns[3][2]]]
             end
         end
     end
@@ -75,12 +96,35 @@ function generate_mechanical_error_description(error_json)
             end
         elseif error_type == "swaps"
             tup = error_json["swaps"][1]
-            sentence = "Sometimes the $(tup[1]) value for a given $(tup[2]) value are different across different $(tup[3]) values, when they should be the same. It should be inferred which of these is correct so all $(tup[3]) values provide the same information."
+            sentence = "Sometimes the $(tup[1]) value for a given $(tup[2][1]) value are different across different $(tup[3]) values, when they should be the same. It should be inferred which of these is correct so all $(tup[3]) values provide the same information."
             push!(sentences, sentence)
         end
     end
 
     join(sentences, " ")
+end
+
+function generate_mechanical_schema_description(table_json)
+    sentences = []
+    sentence = """The schema has $(length(table_json["table_names"])) tables, which we'll call $(format_list(table_json["table_names"]))."""
+    push!(sentences, sentence)
+    for table_index in 1:length(table_json["table_names"])
+        table_name = table_json["table_names"][table_index]
+        table_columns = map(t -> t[2], filter(tup -> tup[1] == table_index - 1, table_json["column_names"]))
+        sentence = "The table $(table_name) has columns $(format_list(table_columns))."
+        push!(sentences, sentence)
+    end
+    foreign_key_phrases = []
+    for pair in table_json["foreign_keys"]
+        associated_column_tuples = map(i -> table_json["column_names"][i + 1], pair)
+        associated_table_names = map(tup -> table_json["table_names"][tup[1] + 1], associated_column_tuples)
+        associated_column_names = map(tup -> tup[2], associated_column_tuples)
+        phrase = "$(associated_column_names[1]) of $(associated_table_names[1]) is a foreign key reference to $(associated_column_names[2]) of $(associated_table_names[2])"
+        push!(foreign_key_phrases, phrase)
+    end
+    sentence = "Finally, $(format_list(foreign_key_phrases))."
+    push!(sentences, sentence)
+    return join(sentences, " ")
 end
 
 function format_list(list)
@@ -234,7 +278,8 @@ function generate_dataset_excerpt(table_json, dataset_size=40, random_subset=fal
     end
     join_statements_str = join(join_statements, "\n")
     columns_list = []
-    repeat_column_names = Set(unique(map(x -> replace(x[2], " " => "_"), filter(tup -> count(t -> t[2] == tup[2], table_json["column_names"]) > 1, table_json["column_names"]))))
+    columns_after_subset = filter(tup -> (tup[1] + 1) in subgraph_table_indices, table_json["column_names"])
+    repeat_column_names = Set(unique(map(x -> replace(x[2], " " => "_"), filter(tup -> count(t -> t[2] == tup[2], columns_after_subset) > 1, columns_after_subset))))
     for table_index in subgraph_table_indices 
         table_name = table_json["table_names_original"][table_index]
 
@@ -298,8 +343,88 @@ function generate_dataset_excerpt(table_json, dataset_size=40, random_subset=fal
     
     # run SQL code
     dataset_excerpt = readchomp(`bash test.sh`)
+    
+    # write excerpt to file
+    if !isdir("spider_dataset_excerpts")
+        mkdir("spider_dataset_excerpts")
+    end
+    open("""spider_dataset_excerpts/$(table_json["db_id"])_excerpt.csv""", "w") do f 
+        write(f, dataset_excerpt)
+    end
 
     return dataset_excerpt, subgraph_table_indices, subgraph_pk_fk_pairs
+end
+
+# used to generate schema JSON / PClean programs with subsets of the full schema
+function update_schema_json_with_subset(table_json, subgraph_table_indices, subgraph_pk_fk_pairs)
+    println("update_schema_json_with_subset")
+    println(subgraph_pk_fk_pairs)
+    # to update: table_names (incl. original), column_names (incl. original), column_types, foreign_keys
+    new_table_json = deepcopy(table_json)
+    subgraph_table_indices = sort(subgraph_table_indices)
+
+    # new table_names and table_names_original: just filter to subgraph_table_indices
+    old_to_new_table_indices = Dict(map(tup -> tup[1] - 1 => tup[2], zip(subgraph_table_indices, [0:(length(subgraph_table_indices) - 1)...])))
+    new_table_names = map(i -> table_json["table_names"][i], subgraph_table_indices)
+    new_table_names_original = map(i -> table_json["table_names_original"][i], subgraph_table_indices)
+
+    # new column_types: just filter to columns in subgraph_table_indices
+    column_positions_to_keep = findall(tup -> (tup[1] + 1) in subgraph_table_indices, table_json["column_names"])
+    new_column_types = map(i -> table_json["column_types"][i], column_positions_to_keep)
+
+    # new column_names and column_names_original: filter to columns with tables in subgraph_table_indices, then remap table indices
+    new_column_indices = [0:(length(column_positions_to_keep) - 1)...]
+    old_to_new_column_indices = Dict(map(tup -> tup[1] - 1 => tup[2], zip(column_positions_to_keep, new_column_indices)))
+
+    new_column_names = deepcopy(map(i -> table_json["column_names"][i], column_positions_to_keep))
+    new_column_names_original = deepcopy(map(i -> table_json["column_names_original"][i], column_positions_to_keep))
+
+    for i in 1:length(new_column_names)
+        # update associated table indices
+        new_column_names[i][1] = old_to_new_table_indices[new_column_names[i][1]]
+        new_column_names_original[i][1] = old_to_new_table_indices[new_column_names_original[i][1]]
+    end
+
+    # new foreign_keys: use column index remapping dictionary to remap indices
+    println(subgraph_pk_fk_pairs)
+    new_foreign_keys = []
+    for pair in subgraph_pk_fk_pairs
+        new_pair = [old_to_new_column_indices[pair[1]], old_to_new_column_indices[pair[2]]]
+        push!(new_foreign_keys, new_pair)
+    end
+
+    # need to rename columns and tables
+    new_table_names = map(t -> replace(t, " " => "_"), new_table_names)
+    new_column_names = map(tup -> [tup[1], replace(tup[2], " " => "_")], new_column_names)
+    repeat_column_names = Set(unique(map(x -> replace(x[2], " " => "_"), filter(tup -> count(t -> t[2] == tup[2], new_column_names) > 1, new_column_names))))
+    new_column_names_formatted = []
+    for tup in new_column_names 
+        if tup[2] in repeat_column_names 
+            table_name = new_table_names[tup[1] + 1]
+            if !occursin(table_name, tup[2])
+                formatted_col_name = "$(table_name)_$(tup[2])"
+                push!(new_column_names_formatted, [tup[1], formatted_col_name])
+            else
+                push!(new_column_names_formatted, tup)
+            end 
+        else
+            push!(new_column_names_formatted, tup)
+        end
+    end
+
+    # new primary_keys: filter out only those in the new table set, and then remap with column index remap dictionary
+    new_primary_keys = filter(col_index -> (table_json["column_names"][col_index + 1][1] + 1) in subgraph_table_indices, table_json["primary_keys"])
+    new_primary_keys = map(i -> old_to_new_column_indices[i], new_primary_keys)
+
+    new_table_json["table_names"] = new_table_names 
+    new_table_json["table_names_original"] = new_table_names_original
+    new_table_json["column_names"] = new_column_names_formatted 
+    new_table_json["column_names_original"] = new_column_names_original
+    new_table_json["foreign_keys"] = new_foreign_keys
+    new_table_json["column_types"] = new_column_types
+    new_table_json["primary_keys"] = new_primary_keys
+
+    return new_table_json
 end
 
 function find_largest_subgraph(table_json)
@@ -354,6 +479,83 @@ end
 function is_fully_connected(table_json)
     _, _, fully_connected = find_largest_subgraph(table_json)
     return fully_connected
+end
+
+function test_generation(table_json, subset_bool=false)
+    dataset_excerpt, subgraph_table_indices, subgraph_pk_fk_pairs = generate_dataset_excerpt(table_json, 40, subset_bool)
+    updated_schema_json = update_schema_json_with_subset(table_json, subgraph_table_indices, subgraph_pk_fk_pairs)
+    error_json = generate_error_json(updated_schema_json)
+    error_description = generate_mechanical_error_description(error_json)
+    println("error_json")
+    println(error_json)
+    program = generate_program2(custom=[updated_schema_json, error_json])
+    return (dataset_excerpt, updated_schema_json, error_json, error_description, program)
+end
+
+function test_generation_conversation_json(table_json, mode="conversational_terse", subset_bool=false)
+    dataset_excerpt, schema_json, error_json, error_description, program = test_generation(table_json, subset_bool)
+    program = "PClean.@model$(split(program, "PClean.@model")[end])"
+    if mode == "conversational_terse" 
+        user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
+    
+        Dataset Excerpt:
+        $(dataset_excerpt)
+    
+        Error Description: $(error_description)
+    
+        Given this dataset excerpt and error description, please respond with a PClean program that describes the schema of the datase and the errors it contains. In your response, don't include any other text other than the PClean program.
+        """
+        llm_response = program
+    
+        output_json = """{
+              "messages": [
+                    {"role": "system", "content": "You are a programmer helping write code from user instructions."},
+                    {"role": "user", "content": $(repr(user_message))},
+                    {"role": "assistant", "content": $(repr(llm_response))},
+                ]
+        }"""
+        return output_json
+    elseif mode == "conversational_long"
+        user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
+    
+        Dataset Excerpt:
+        $(dataset_excerpt)
+    
+        Error Description: $(error_description)
+    
+        Given this dataset excerpt and error description, the goal is to write a PClean program that describes the schema of the dataset and the errors it contains. 
+
+        A good first step is to describe the schema of the dataset, since the structure of the PClean program closely follows the dataset schema. Can you describe the schema of the given dataset, provided the excerpt above?
+        """
+        llm_response = program
+        schema_description = generate_mechanical_schema_description(schema_json)
+    
+        output_json = """{
+              "messages": [
+                    {"role": "system", "content": "You are a programmer helping write code from user instructions."},
+                    {"role": "user", "content": $(repr(user_message))},
+                    {"role": "assistant", "content": "Yes! The following describes the schema: $(schema_description)"},
+                    {"role": "user", "content": "Awesome! Now, based on this schema and the previously provided error description, please write a PClean program that describes the schema of the dataset and the errors it contains. Please only include the PClean program in your response, without any preceding or following text."},
+                    {"role": "assistant", "content": $(repr(llm_response))},
+                ]
+        }"""
+        return output_json
+    elseif mode == "instruct"
+        user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
+    
+        Dataset Excerpt:
+        $(dataset_excerpt)
+    
+        Error Description: $(error_description)
+    
+        Given this dataset excerpt and error description, please respond with a PClean program that describes the schema of the datase and the errors it contains. In your response, don't include any other text other than the PClean program.
+        """
+        llm_response = program
+        return """{
+            "prompt": $(repr(user_message)),
+            "completion": $(repr(llm_response)),
+        }"""
+    end
 end
 
 function generate_prompts_and_completions()

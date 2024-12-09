@@ -9,16 +9,21 @@ spaces = 4
 tab = join(map(x -> " ", 1:spaces))
 function generate_program(table_index=1; random=false, custom=nothing, prior_spec=nothing)
     if !isnothing(custom)
-        custom_schema_file, custom_error_file, custom_data_file = custom
-        open(custom_schema_file) do f 
-            global text = read(f, String)
+        if length(custom) == 3 
+            custom_schema_file, custom_error_file, custom_data_file = custom
+            open(custom_schema_file) do f 
+                global text = read(f, String)
+            end
+            table = JSON.parse(split(text, "\n\n")[2])
+    
+            open(custom_error_file) do f 
+                global text = read(f, String)
+            end
+            error_json = JSON.parse(split(text, "\n\n")[2])
+        else
+            table, error_json = custom
+            custom_data_file = "spider_dataset_excerpts/" + table["db_id"] + ".csv"
         end
-        table = JSON.parse(split(text, "\n\n")[2])
-
-        open(custom_error_file) do f 
-            global text = read(f, String)
-        end
-        error_json = JSON.parse(split(text, "\n\n")[2])
 
         # remove foreign keys from error json -- already represented elsewhere
         if "typos" in keys(error_json)
@@ -32,22 +37,39 @@ function generate_program(table_index=1; random=false, custom=nothing, prior_spe
         omitted = []
         if length(names(dirty_table)) != length(table["column_names"])
             for dirty_name in names(dirty_table)
-                if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), table["column_names"]))
-                    push!(omitted, dirty_name)
+                if !isnothing(custom) && length(custom) == 2 
+                    if !(dirty_name in map(tup -> tup[2], table["column_names"]))
+                        push!(omitted, dirty_name)
+                    end
+                else
+                    if !(lowercase(join(split(join(split(dirty_name, " "), ""), "_"), "")) in map(tup -> lowercase(join(split(join(split(tup[2], "_"), ""), " "), "")), table["column_names"]))
+                        push!(omitted, dirty_name)
+                    end
                 end
             end
         end
         dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
         
         ## construct possibilities
-        foreign_keys = map(tup -> table["column_names"][tup[1] + 1][2], table["foreign_keys"])
-        column_names_without_foreign_keys = filter(tup -> !(tup[2] in foreign_keys), table["column_names"])
-        if length(omitted) == 0 
-            column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
-            column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
+        foreign_keys = map(tup -> table["column_names"][tup[1] + 1], table["foreign_keys"])
+        if length(custom) == 2 
+            cols = map(tup -> tup[2], table["column_names"])
+            column_renaming_dict = Dict(zip(cols, cols))
+            column_renaming_dict_reverse = Dict(zip(cols, cols))
         else
-            column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
-            column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+            column_names_without_foreign_keys = filter(tup -> !(tup in foreign_keys), table["column_names"])
+            matching_columns = []
+            for col in dirty_columns 
+                println(col)
+                match_indices = findall(tup -> lowercase(join(split(join(split(tup[2], " "), ""), "_"), "")) == lowercase(join(split(join(split(col, " "), ""), "_"), "")), column_names_without_foreign_keys)
+                if length(match_indices) > 0
+                    push!(matching_columns, column_names_without_foreign_keys[match_indices[1]][2])
+                else
+                    error("matching column not found")
+                end
+            end
+            column_renaming_dict = Dict(zip(dirty_columns, matching_columns))
+            column_renaming_dict_reverse = Dict(zip(matching_columns, dirty_columns))
         end
 
         possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
@@ -107,6 +129,51 @@ function generate_program(table_index=1; random=false, custom=nothing, prior_spe
         units_str = ""
     end
 
+    if !isnothing(custom) && length(custom) == 2 
+        renaming_dict_str = """omitted = []
+        if length(names(dirty_table)) != length($(table["column_names"]))
+            for dirty_name in names(dirty_table)
+                if !(dirty_name in map(tup -> tup[2], $(table["column_names"])))
+                    push!(omitted, dirty_name)
+                end
+            end
+        end
+        dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+    
+        ## construct possibilities
+        cols = $(map(tup -> tup[2], table["column_names"]))
+        column_renaming_dict = Dict(zip(cols, cols))
+        column_renaming_dict_reverse = Dict(zip(cols, cols))"""
+    else
+        renaming_dict_str = """omitted = []
+        if length(names(dirty_table)) != length($(table["column_names"]))
+            for dirty_name in names(dirty_table)
+                if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), $(table["column_names"])))
+                    push!(omitted, dirty_name)
+                end
+            end
+        end
+        dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+    
+        ## construct possibilities
+        cols = $(table["column_names"])
+        foreign_keys = map(tup -> cols[tup[1] + 1], $(table["foreign_keys"]))
+        column_names_without_foreign_keys = filter(tup -> !(tup in foreign_keys), cols)
+        matching_columns = []
+        for col in dirty_columns 
+            println(col)
+            match_indices = findall(tup -> lowercase(join(split(join(split(tup[2], " "), ""), "_"), "")) == lowercase(join(split(join(split(col, " "), ""), "_"), "")), column_names_without_foreign_keys)
+            if length(match_indices) > 0
+                push!(matching_columns, column_names_without_foreign_keys[match_indices[1]][2])
+            else
+                error("matching column not found")
+            end
+        end
+        column_renaming_dict = Dict(zip(dirty_columns, matching_columns))
+        column_renaming_dict_reverse = Dict(zip(matching_columns, dirty_columns))"""
+    end
+
+
     swap_possibilities_str = ""
     if length(keys(error_json)) != 0 && "swaps" in keys(error_json)
         swap_possibilities_str = """swap_possibilities = Dict()
@@ -145,26 +212,7 @@ function generate_program(table_index=1; random=false, custom=nothing, prior_spe
 
     $(swap_possibilities_str != "" ? "" : subset_size_string)
 
-    omitted = []
-    if length(names(dirty_table)) != length($(table["column_names"]))
-        for dirty_name in names(dirty_table)
-            if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), $(table["column_names"])))
-                push!(omitted, dirty_name)
-            end
-        end
-    end
-    dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
-    
-    ## construct possibilities
-    foreign_keys = $(map(tup -> table["column_names"][tup[1] + 1][2], table["foreign_keys"]))
-    column_names_without_foreign_keys = $(filter(tup -> !(tup[2] in foreign_keys), table["column_names"]))
-    if length(omitted) == 0 
-        column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
-        column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
-    else
-        column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
-        column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
-    end
+    $(renaming_dict_str)
 
     possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
     for r in eachrow(dirty_table)
@@ -214,7 +262,9 @@ function generate_classes(table_json, error_json, possibilities, custom_priors)
             push!(obs_class_declaration_strings, "$(tab)$(tab)$(unformatted_class) ~ $(formatted_class)")
     
             # don't include unmodeled first column
-            columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
+            unmodeled_columns = filter(tup -> occursin("id", tup[2]) && table_json["column_types"][findall(x -> x == tup, table_json["column_names"])[1]] in ["number", "integer"] && tup[2] in map(i -> table_json["column_names"][i + 1][2], table_json["primary_keys"]), table_json["column_names"])
+            columns = filter(tup -> !(tup in unmodeled_columns), table_json["column_names"])
+            # columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
             # println(columns)
             if has_errors && "unit_errors" in keys(error_json)
                 println("YO")
@@ -244,7 +294,9 @@ function generate_classes(table_json, error_json, possibilities, custom_priors)
                 formatted_class = join(map(x -> capitalize(x), split(variation_column, " ")), "_")
 
                 println(columns)
-                columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
+                unmodeled_columns = filter(tup -> occursin("id", tup[2]) && table_json["column_types"][findall(x -> x == tup, table_json["column_names"])[1]] in ["number", "integer"] && tup[2] in map(i -> table_json["column_names"][i + 1][2], table_json["primary_keys"]), table_json["column_names"])
+                columns = filter(tup -> !(tup in unmodeled_columns), table_json["column_names"])
+                # columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
                 if has_errors && "unit_errors" in keys(error_json)
                     println("YO")
                     columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), table_json["column_names"])
@@ -290,7 +342,9 @@ function generate_classes(table_json, error_json, possibilities, custom_priors)
         variation_columns = []
     end
 
-    columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
+    unmodeled_columns = filter(tup -> occursin("id", tup[2]) && table_json["column_types"][findall(x -> x == tup, table_json["column_names"])[1]] in ["number", "integer"] && tup[2] in map(i -> table_json["column_names"][i + 1][2], table_json["primary_keys"]), table_json["column_names"])
+    columns = filter(tup -> !(tup in unmodeled_columns), table_json["column_names"])
+    # columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
     # println(columns)
     if has_errors && "unit_errors" in keys(error_json)
         println("YO")
@@ -314,11 +368,15 @@ function generate_classes(table_json, error_json, possibilities, custom_priors)
                 original_column_name = column[2]
                 column_name = replace(original_column_name, " " => "_")
 
-                if index == 1 && occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"]
+                # if index == 1 && occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"]
+                #     handled[string(index) * "_" * string(column[2])] = true
+                #     continue
+                # end
+
+                if occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"] && column_name in map(i -> table_json["column_names"][i + 1][2], table_json["primary_keys"])
                     handled[string(index) * "_" * string(column[2])] = true
                     continue
                 end
-
                 # if !occursin(lowercase(table_name), lowercase(column_name))
                 #     column_name = "$(lowercase(table_name))_$(column_name)"
                 # end
@@ -375,6 +433,7 @@ function generate_classes(table_json, error_json, possibilities, custom_priors)
                             end
                         elseif original_table_name in non_primary_classes
                             # no error, but this field still needs to be instantiated b/c it is not in a primary table
+                            println(original_column_name)
                             class_index = column[1] + 1
                             col_index = findall(t -> t[2] == original_column_name, filter(tup -> tup[1] == class_index - 1, columns))[1]
                             obs_column_str = """$(tab)$(tab)$(column_name) ~ $(generate_prior(table_json, class_index, col_index, error_json, possibilities, custom_priors))"""
@@ -415,12 +474,18 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
     for (index, column) in enumerate(table_json["column_names"])
         # keep column as long as it's not the FK in a FK-PK pair
         if column[1] != -1 && !((index - 1) in map(tup -> tup[1], table_json["foreign_keys"]))
-
+            println(column)
             original_table_name = table_json["table_names"][column[1] + 1]
             table_name = join(map(x -> capitalize(x), split(original_table_name, " ")), "_")
             table_name = lowercase(table_name[1:1]) * table_name[2:end]
             original_column_name = column[2]
             column_name = replace(original_column_name, " " => "_")
+
+            # don't include unmodeled first column
+            if occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"] && column_name in map(i -> table_json["column_names"][i + 1][2], table_json["primary_keys"])
+                continue
+            end
+
             if manual_join # length(table_json["table_names"]) > 1 # manual joining case -- we change all the column names
                 if !occursin(lowercase(table_name), lowercase(column_name))
                     query_column_name = "$(lowercase(table_name))_$(column_name)"
@@ -433,11 +498,6 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
                 if occursin(" ", query_column_name)
                     query_column_name = "\"" * query_column_name * "\""
                 end
-            end
-
-            # don't include unmodeled first column
-            if occursin("id", column_name) && table_json["column_types"][index] in ["number", "integer"] && table_json["column_names"][1][2] == column_name
-                continue
             end
 
             if has_errors 
@@ -458,7 +518,11 @@ function generate_query(table_json, error_json, column_renaming_dict_reverse, ma
                 elseif "swaps" in keys(error_json) && original_column_name in map(tup -> tup[3], error_json["swaps"])
                     obs_column_str = "$(tab)$(query_column_name) $(column_name).$(column_name)"
                 else
-                    obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
+                    if original_table_name in non_primary_classes 
+                        obs_column_str = "$(tab)$(query_column_name) $(column_name)"
+                    else
+                        obs_column_str = "$(tab)$(query_column_name) $(table_name).$(column_name)"
+                    end
                 end
             else 
                 if original_table_name in non_primary_classes 
@@ -482,7 +546,9 @@ function generate_prior(table_json, class_index, col_index, error_json, ps, cust
 
     has_errors = length(keys(error_json)) != 0
     columns = table_json["column_names"]
-    columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
+    unmodeled_columns = filter(tup -> occursin("id", tup[2]) && table_json["column_types"][findall(x -> x == tup, table_json["column_names"])[1]] in ["number", "integer"] && tup[2] in map(i -> table_json["column_names"][i + 1][2], table_json["primary_keys"]), table_json["column_names"])
+    columns = filter(tup -> !(tup in unmodeled_columns), table_json["column_names"])
+    # columns = map(x -> x[2], filter(tup -> !(tup[1] == 1 && occursin("id", tup[2][2]) && table_json["column_types"][tup[1]] in ["number", "integer"]), [enumerate(table_json["column_names"])...]))
     if has_errors && "unit_errors" in keys(error_json)
         println("YO")
         columns = filter(tup -> !(tup[2] in map(t -> t[1], error_json["unit_errors"])), columns)

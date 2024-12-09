@@ -1,0 +1,23 @@
+Based on the error description, I'll create a JSON with the relevant error types:
+
+{
+    "typos" : [
+      "provider_number",
+       "hospital_name",
+       "address1",
+       "city",
+       "state",
+       "zip_code",
+       "county_name",
+       "phone_number",
+       "hospital_type",
+       "hospital_owner",
+       "emergency_service",
+       "measure_code",
+       "measure_name",
+       "condition",
+       "hospital_id",
+       "measure_id",
+       "state_avg"
+    ]
+}

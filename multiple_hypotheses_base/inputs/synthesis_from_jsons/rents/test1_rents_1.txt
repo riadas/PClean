@@ -1,0 +1,31 @@
+Based on the dataset excerpt, I'll create a JSON schema that matches the specified format. Here's the "table.json" content:
+
+{
+    "db_id": "rental_data",
+    "table_names": ["rental_listings"],
+    "column_names": [
+        [0, "id"],
+        [0, "room_type"],
+        [0, "monthly_rent"],
+        [0, "county"],
+        [0, "state"]
+    ],
+    "column_types": [
+        "integer",
+        "text",
+        "decimal",
+        "text",
+        "text"
+    ],
+    "foreign_keys": [],
+    "primary_keys": [0]
+}
+
+This schema represents:
+- A single table named "rental_listings"
+- 5 columns: id (Column1), room_type, monthly_rent, county, and state
+- Appropriate data types for each column
+- The id column (index 0) as the primary key
+- No foreign keys since this is a single table with no relationships
+
+The schema captures all the essential information from the dataset while following the specified format. The column types are assigned based on the data content shown in the excerpt.

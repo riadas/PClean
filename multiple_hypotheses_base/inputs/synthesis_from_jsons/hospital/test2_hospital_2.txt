@@ -1,0 +1,23 @@
+Based on the error description stating that there are typos in every column, here's the appropriate error JSON:
+
+{
+  "typos": [
+    "ProviderNumber",
+    "HospitalName",
+    "Address1",
+    "City",
+    "State",
+    "ZipCode",
+    "CountyName",
+    "PhoneNumber",
+    "HospitalType",
+    "HospitalOwner",
+    "EmergencyService",
+    "Condition",
+    "MeasureCode",
+    "MeasureName",
+    "Stateavg"
+  ]
+}
+
+Note: Since the error description only mentions typos and doesn't mention any unit errors or swaps, I've omitted the `unit_errors` and `swaps` fields from the JSON. The `typos` array includes all column names from the schema JSON since the error description states that every column contains typos.

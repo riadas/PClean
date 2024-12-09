@@ -1,0 +1,49 @@
+Based on the dataset excerpt, I'll create a schema JSON file that excludes the Score, Sample, Address2, and Address3 columns. Here's the appropriate schema:
+
+{
+  "db_id": "hospital_data",
+  "table_names": ["hospital_measures"],
+  "column_names": [
+    [0, "ProviderNumber"],
+    [0, "HospitalName"],
+    [0, "Address1"],
+    [0, "City"],
+    [0, "State"],
+    [0, "ZipCode"],
+    [0, "CountyName"],
+    [0, "PhoneNumber"],
+    [0, "HospitalType"],
+    [0, "HospitalOwner"],
+    [0, "EmergencyService"],
+    [0, "Condition"],
+    [0, "MeasureCode"],
+    [0, "MeasureName"],
+    [0, "Stateavg"]
+  ],
+  "column_types": [
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text"
+  ],
+  "foreign_keys": [],
+  "primary_keys": [0]
+}
+
+Notes about this schema:
+1. All columns are treated as "text" type since even numeric-looking fields (like ProviderNumber and ZipCode) contain non-numeric characters in some rows
+2. ProviderNumber is set as the primary key (index 0)
+3. There are no foreign keys in this single-table dataset
+4. The excluded columns (Score, Sample, Address2, and Address3) are not included in the schema
+5. All columns are part of a single table named "hospital_measures"
