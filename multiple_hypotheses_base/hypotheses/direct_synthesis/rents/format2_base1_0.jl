@@ -8,7 +8,7 @@ dirty_table = CSV.File("datasets/rents_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("datasets/rents_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
 
-subset_size = size(dirty_table, 1)
+subset_size = 1000 #size(dirty_table, 1)
 dirty_table = first(dirty_table, subset_size)
 clean_table = first(clean_table, subset_size)
 
