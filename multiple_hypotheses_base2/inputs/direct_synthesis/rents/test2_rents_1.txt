@@ -1,0 +1,6 @@
+Based on the error description, I'll create a JSON with the relevant error types:
+
+{
+    "typos": ["county"],
+    "unit_errors": [["monthly_rent", 1000]]
+}

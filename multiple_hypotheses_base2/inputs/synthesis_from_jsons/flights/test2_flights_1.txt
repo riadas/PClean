@@ -1,0 +1,16 @@
+Based on the error description, this is a case of potential swaps in the time-related columns. The description suggests that different sources might report different times for the same flight, which means we need to identify possible swaps across rows that share the same flight number but have different sources.
+
+{
+  "swaps": [
+    ["sched_dep_time", ["flight"], "src"],
+    ["act_dep_time", ["flight"], "src"],
+    ["sched_arr_time", ["flight"], "src"],
+    ["act_arr_time", ["flight"], "src"]
+  ]
+}
+
+This JSON indicates that:
+- For each of the time-related columns (scheduled/actual departure/arrival times), there might be swaps
+- These swaps occur across rows that share the same flight number ("flight")
+- The swaps are differentiated by different sources ("src")
+- We don't have any typos or unit errors mentioned in the description, so those fields are omitted
