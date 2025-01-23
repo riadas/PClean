@@ -3,8 +3,8 @@ home_directory = "/Users/riadas/Documents/phd/classes/databases/final_project/PC
 num_repeats = 3
 text = ""
 for subset_size in [100, 200, 300] # , 200, 300
-    for method in ["synthesis_from_jsons"] # ["synthesis_from_jsons", "direct_synthesis"]
-        for benchmark in ["flights"] # "rents", "hospital", 
+    for method in ["direct_synthesis", "synthesis_from_jsons"] # ["synthesis_from_jsons", "direct_synthesis"]
+        for benchmark in ["rents"] # "rents", "hospital", 
             results = []
             for filename in readdir("$(home_directory)/multiple_hypotheses_base2/hypotheses/$(method)/$(benchmark)")
                 if occursin("base2", filename)

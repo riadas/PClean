@@ -62,7 +62,7 @@ swap_possibilities = Dict(c => [swap_possibilities[c]...] for c in keys(swap_pos
 
 
 
-subset_size = size(dirty_table, 1)
+subset_size = 100
 dirty_table = first(dirty_table, subset_size)
 clean_table = first(clean_table, subset_size)
 

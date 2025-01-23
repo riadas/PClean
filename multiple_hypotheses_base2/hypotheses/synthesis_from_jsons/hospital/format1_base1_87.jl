@@ -4,18 +4,20 @@ using DataFrames: DataFrame
 using Statistics
 
 # data handling
-dirty_table = CSV.File("datasets/rents_dirty.csv") |> DataFrame
-clean_table = CSV.File(replace("datasets/rents_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
-
+dirty_table = CSV.File("datasets/hospital_dirty.csv") |> DataFrame
+clean_table = CSV.File(replace("datasets/hospital_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
+clean_table[!, :PhoneNumber] = map(x -> "$x", clean_table[!, :PhoneNumber])
+clean_table[!, :ZipCode] = map(x -> "$x", clean_table[!, :ZipCode])
+clean_table[!, :ProviderNumber] = map(x -> "$x", clean_table[!, :ProviderNumber])
 
 subset_size = size(dirty_table, 1)
 dirty_table = first(dirty_table, subset_size)
 clean_table = first(clean_table, subset_size)
 
 omitted = []
-if length(names(dirty_table)) != length(Any[Any[0, "id"], Any[0, "room_type"], Any[0, "monthly_rent"], Any[0, "county"], Any[0, "state"]])
+if length(names(dirty_table)) != length(Any[Any[0, "provider_number"], Any[0, "hospital_name"], Any[0, "address1"], Any[0, "city"], Any[0, "state"], Any[0, "zip_code"], Any[0, "county_name"], Any[0, "phone_number"], Any[0, "hospital_type"], Any[0, "hospital_owner"], Any[0, "emergency_service"], Any[1, "measure_code"], Any[1, "measure_name"], Any[1, "condition"], Any[2, "hospital_id"], Any[2, "measure_id"], Any[2, "state_avg"]])
     for dirty_name in names(dirty_table)
-        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[0, "id"], Any[0, "room_type"], Any[0, "monthly_rent"], Any[0, "county"], Any[0, "state"]]))
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[0, "provider_number"], Any[0, "hospital_name"], Any[0, "address1"], Any[0, "city"], Any[0, "state"], Any[0, "zip_code"], Any[0, "county_name"], Any[0, "phone_number"], Any[0, "hospital_type"], Any[0, "hospital_owner"], Any[0, "emergency_service"], Any[1, "measure_code"], Any[1, "measure_name"], Any[1, "condition"], Any[2, "hospital_id"], Any[2, "measure_id"], Any[2, "state_avg"]]))
             push!(omitted, dirty_name)
         end
     end
@@ -23,8 +25,8 @@ end
 dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
 
 ## construct possibilities
-foreign_keys = Any[]
-column_names_without_foreign_keys = Any[Any[0, "id"], Any[0, "room_type"], Any[0, "monthly_rent"], Any[0, "county"], Any[0, "state"]]
+foreign_keys = ["hospital_id", "measure_id"]
+column_names_without_foreign_keys = Any[Any[0, "provider_number"], Any[0, "hospital_name"], Any[0, "address1"], Any[0, "city"], Any[0, "state"], Any[0, "zip_code"], Any[0, "county_name"], Any[0, "phone_number"], Any[0, "hospital_type"], Any[0, "hospital_owner"], Any[0, "emergency_service"], Any[1, "measure_code"], Any[1, "measure_name"], Any[1, "condition"], Any[2, "state_avg"]]
 if length(omitted) == 0 
     column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
     column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
@@ -45,38 +47,74 @@ possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
 
 
 
-units = [Transformation(x -> x/1* 1.0, x -> x*1*1.0, x -> 1/1*1.0), Transformation(x -> x/1000* 1.0, x -> x*1000*1.0, x -> 1/1000*1.0)]
 
 
 
-PClean.@model RentalDataModel begin
-    @class Rental_listings begin
-        room_type ~ ChooseUniformly(possibilities[:room_type])
-        county ~ StringPrior(5, 35, possibilities[:county])
-        state ~ ChooseUniformly(possibilities[:state])
+
+PClean.@model HospitalQualityModel begin
+    @class Hospitals begin
+        provider_number ~ ChooseUniformly(possibilities[:provider_number])
+        hospital_name ~ StringPrior(16, 36, possibilities[:hospital_name])
+        address1 ~ StringPrior(10, 28, possibilities[:address1])
+        city ~ StringPrior(3, 12, possibilities[:city])
+        state ~ StringPrior(2, 2, possibilities[:state])
+        zip_code ~ ChooseUniformly(possibilities[:zip_code])
+        county_name ~ StringPrior(3, 10, possibilities[:county_name])
+        phone_number ~ StringPrior(10, 10, possibilities[:phone_number])
+        hospital_type ~ ChooseUniformly(possibilities[:hospital_type])
+        hospital_owner ~ StringPrior(11, 43, possibilities[:hospital_owner])
+        emergency_service ~ StringPrior(2, 3, possibilities[:emergency_service])
+    end
+
+    @class Measures begin
+        measure_code ~ ChooseUniformly(possibilities[:measure_code])
+        measure_name ~ ChooseUniformly(possibilities[:measure_name])
+        condition ~ ChooseUniformly(possibilities[:condition])
     end
 
     @class Obs begin
-        rental_listings ~ Rental_listings
-        @learned avg_monthly_rent::Dict{String, MeanParameter{2068.443249159866, 1339.4564887947838}}
-        unit_monthly_rent ~ ChooseUniformly(units)
-        monthly_rent_base = avg_monthly_rent["$(rental_listings.room_type)_$(rental_listings.county)_$(rental_listings.state)"]
-        monthly_rent ~ TransformedGaussian(monthly_rent_base, 1339.4564887947838/10, unit_monthly_rent)
-        monthly_rent_corrected = round(unit_monthly_rent.backward(monthly_rent))
-        county ~ AddTypos(rental_listings.county, 2)
+        hospitals ~ Hospitals
+        measures ~ Measures
+        provider_number ~ AddTypos(hospitals.provider_number, 2)
+        hospital_name ~ AddTypos(hospitals.hospital_name, 2)
+        address1 ~ AddTypos(hospitals.address1, 2)
+        city ~ AddTypos(hospitals.city, 2)
+        state ~ AddTypos(hospitals.state, 2)
+        zip_code ~ AddTypos(hospitals.zip_code, 2)
+        county_name ~ AddTypos(hospitals.county_name, 2)
+        phone_number ~ AddTypos(hospitals.phone_number, 2)
+        hospital_type ~ AddTypos(hospitals.hospital_type, 2)
+        hospital_owner ~ AddTypos(hospitals.hospital_owner, 2)
+        emergency_service ~ AddTypos(hospitals.emergency_service, 2)
+        measure_code ~ AddTypos(measures.measure_code, 2)
+        measure_name ~ AddTypos(measures.measure_name, 2)
+        condition ~ AddTypos(measures.condition, 2)
+        state_avg ~ ChooseUniformly(possibilities[:state_avg])
+        state_avg_typo ~ AddTypos(state_avg, 2)
     end
 end
 
-query = @query RentalDataModel.Obs [
-    "Room Type" rental_listings.room_type
-    "Monthly Rent" monthly_rent_corrected monthly_rent
-    County rental_listings.county county
-    State rental_listings.state
+query = @query HospitalQualityModel.Obs [
+    ProviderNumber hospitals.provider_number provider_number
+    HospitalName hospitals.hospital_name hospital_name
+    Address1 hospitals.address1 address1
+    City hospitals.city city
+    State hospitals.state state
+    ZipCode hospitals.zip_code zip_code
+    CountyName hospitals.county_name county_name
+    PhoneNumber hospitals.phone_number phone_number
+    HospitalType hospitals.hospital_type hospital_type
+    HospitalOwner hospitals.hospital_owner hospital_owner
+    EmergencyService hospitals.emergency_service emergency_service
+    MeasureCode measures.measure_code measure_code
+    MeasureName measures.measure_name measure_name
+    Condition measures.condition condition
+    Stateavg state_avg state_avg_typo
 ]
 
 
 observations = [ObservedDataset(query, dirty_table)]
-config = PClean.InferenceConfig(1, 2; use_mh_instead_of_pg=true)
+config = PClean.InferenceConfig(5, 2; use_mh_instead_of_pg=true)
 @time begin 
     tr = initialize_trace(observations, config);
     run_inference!(tr, config)
