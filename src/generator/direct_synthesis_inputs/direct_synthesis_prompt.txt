@@ -1,0 +1,211 @@
+PClean is a domain-specific programming language for automated data cleaning. In the following, I will tell you about the structure of a PClean program and provide some example PClean programs, with associated dataset samples and error descriptions, and ask you to write a new PClean program given a new dataset sample and error description.
+
+A PClean program describes the schema of a dataset, as well as a generative model over that schema, where the generative model describes both the generation of correct rows from the schema as well as rows with errors. Given this generative model and a dirty dataset, a PClean program can then use probabilistic inference to perform an inversion process that fixes the errors in the dataset.
+
+For example, below is a sample of a dataset about criminals (perpetrators), including both crime-related and general personal information. 
+
+Perpetrator_ID,People_ID,Date,Year,Location,Country,Killed,Injured,People_ID,Name,Height,Weight,"Home Town"
+1,1,"04.26 April 26/27",1982.0,Uiryeong,"South Korea",56,37,1,"Ron Baxter",6.4,205.0,"Los Angeles, CA"
+2,3,"11.18 Nov. 18",1995.0,Zhaodong,China,32,16,3,"Tyrone Brayan",6.7,220.0,"Placentia, CA"
+3,4,"05.21 May 21",1938.0,Kaio,Japan,30,3,4,"Rob Cunningham",6.8,215.0,"Westport, CT"
+4,6,"09.20 Sep. 20",1994.0,Beijing,China,23,80,6,"Ovie Dotson",6.5,200.0,"San Antonio, TX"
+5,8,"04.00 April",1950.0,Nainital,India,22,0,8,"Henry Johnson",6.6,190.0,"Los Angeles, CA"
+
+If we assume there are no errors in this dataset, the corresponding PClean program would be the following:
+
+PClean.@model PerpetratorModel begin
+    @class People begin
+        people_id ~ Unmodeled()
+        name ~ ChooseUniformly(possibilities[:name])
+        height ~ ChooseUniformly(possibilities[:height])
+        weight ~ ChooseUniformly(possibilities[:weight])
+        home_town ~ ChooseUniformly(possibilities[:home_town])
+    end
+
+    @class Perpetrator begin
+        perpetrator_id ~ Unmodeled()
+        people ~ People
+        date ~ ChooseUniformly(possibilities[:date])
+        year ~ ChooseUniformly(possibilities[:year])
+        location ~ ChooseUniformly(possibilities[:location])
+        country ~ ChooseUniformly(possibilities[:country])
+        killed ~ ChooseUniformly(possibilities[:killed])
+        injured ~ ChooseUniformly(possibilities[:injured])
+    end
+
+    @class Obs begin
+        perpetrator ~ Perpetrator
+    end
+end
+
+query = @query PerpetratorModel.Obs [
+    perpetrator_id perpetrator.perpetrator_id
+    perpetrator_date perpetrator.date
+    perpetrator_year perpetrator.year
+    perpetrator_location perpetrator.location
+    perpetrator_country perpetrator.country
+    perpetrator_killed perpetrator.killed
+    perpetrator_injured perpetrator.injured
+    people_id perpetrator.people.people_id
+    people_name perpetrator.people.name
+    people_height perpetrator.people.height
+    people_weight perpetrator.people.weight
+    people_home_town perpetrator.people.home_town
+]
+
+If there are errors, then this base PClean program would be modified based on the type of errors present. There are three types of errors supported by PClean:
+
+*`typos`: Indicates that a particular column's values are prone to typos.
+
+*`unit_errors`: Indicates that some values in a column might be reported in one unit (e.g. bytes) and other values are reported in a different unit (e.g. kilobytes).
+
+*`swaps`: Indicates that some values in a column are incorrect and must be replaced ("swapped") with other values in the column. For example, the 'column_A' value in a row might be swapped with the 'column_A' value of other rows with the same 'column_B' value but different 'column_C' values.
+
+I now describe how the base PClean program changes with non-empty error descriptions. Below is a PClean program for the same perpetrator dataset, but which has typos in the name and location tables:
+
+PClean.@model PerpetratorModel begin
+    @class People begin
+        people_id ~ Unmodeled()
+        name ~ ChooseUniformly(possibilities[:name])
+        height ~ ChooseUniformly(possibilities[:height])
+        weight ~ ChooseUniformly(possibilities[:weight])
+        home_town ~ ChooseUniformly(possibilities[:home_town])
+    end
+
+    @class Perpetrator begin
+        perpetrator_id ~ Unmodeled()
+        people ~ People
+        date ~ ChooseUniformly(possibilities[:date])
+        year ~ ChooseUniformly(possibilities[:year])
+        location ~ ChooseUniformly(possibilities[:location])
+        country ~ ChooseUniformly(possibilities[:country])
+        killed ~ ChooseUniformly(possibilities[:killed])
+        injured ~ ChooseUniformly(possibilities[:injured])
+    end
+
+    @class Obs begin
+        perpetrator ~ Perpetrator
+        location ~ AddTypos(perpetrator.location, 2)
+        name ~ AddTypos(perpetrator.people.name, 2)
+    end
+end
+
+query = @query PerpetratorModel.Obs [
+    perpetrator_id perpetrator.perpetrator_id
+    perpetrator_date perpetrator.date
+    perpetrator_year perpetrator.year
+    perpetrator_location perpetrator.location location
+    perpetrator_country perpetrator.country
+    perpetrator_killed perpetrator.killed
+    perpetrator_injured perpetrator.injured
+    people_id perpetrator.people.people_id
+    people_name perpetrator.people.name name
+    people_height perpetrator.people.height
+    people_weight perpetrator.people.weight
+    people_home_town perpetrator.people.home_town
+]
+
+
+Next, below is a PClean program with the same perpetrator dataset, but with height sometimes expressed in inches instead of feet (12 inches = one foot):
+
+units = [Transformation(x -> x/1* 1.0, x -> x*1*1.0, x -> 1/1*1.0), Transformation(x -> x/12* 1.0, x -> x*12*1.0, x -> 1/12*1.0)]
+
+PClean.@model PerpetratorModel begin
+    @class People begin
+        people_id ~ Unmodeled()
+        name ~ ChooseUniformly(possibilities[:name])
+        weight ~ ChooseUniformly(possibilities[:weight])
+        home_town ~ ChooseUniformly(possibilities[:home_town])
+    end
+
+    @class Perpetrator begin
+        perpetrator_id ~ Unmodeled()
+        people ~ People
+        date ~ ChooseUniformly(possibilities[:date])
+        year ~ ChooseUniformly(possibilities[:year])
+        location ~ ChooseUniformly(possibilities[:location])
+        country ~ ChooseUniformly(possibilities[:country])
+        killed ~ ChooseUniformly(possibilities[:killed])
+        injured ~ ChooseUniformly(possibilities[:injured])
+    end
+
+    @class Obs begin
+        perpetrator ~ Perpetrator
+        @learned avg_height::Dict{String, MeanParameter{70.0, 2.8284271247461903}}
+        unit_height ~ ChooseUniformly(units)
+        height_base = avg_height["$(people.name)_$(people.home_town)"]
+        height ~ TransformedGaussian(height_base, 2.8284271247461903/10, unit_height)
+        height_corrected = round(unit_height.backward(height))
+    end
+end
+
+query = @query PerpetratorModel.Obs [
+    perpetrator_id perpetrator.perpetrator_id
+    perpetrator_date perpetrator.date
+    perpetrator_year perpetrator.year
+    perpetrator_location perpetrator.location
+    perpetrator_country perpetrator.country
+    perpetrator_killed perpetrator.killed
+    perpetrator_injured perpetrator.injured
+    people_id perpetrator.people.people_id
+    people_name perpetrator.people.name
+    people_height height_corrected height
+    people_weight perpetrator.people.weight
+    people_home_town perpetrator.people.home_town
+]
+
+Finally, below is a PClean program with the following error model: Sometimes, the name of a person is swapped with the names of others from the same home town, but with different heights.
+
+PClean.@model PerpetratorModel begin
+    @class Height begin
+        height ~ ChooseUniformly(possibilities[:height])
+    end
+
+    @class People begin
+        people_id ~ Unmodeled()
+        name ~ ChooseUniformly(possibilities[:name])
+        weight ~ ChooseUniformly(possibilities[:weight])
+        home_town ~ ChooseUniformly(possibilities[:home_town])
+    end
+
+    @class Perpetrator begin
+        perpetrator_id ~ Unmodeled()
+        people ~ People
+        date ~ ChooseUniformly(possibilities[:date])
+        year ~ ChooseUniformly(possibilities[:year])
+        location ~ ChooseUniformly(possibilities[:location])
+        country ~ ChooseUniformly(possibilities[:country])
+        killed ~ ChooseUniformly(possibilities[:killed])
+        injured ~ ChooseUniformly(possibilities[:injured])
+    end
+
+    @class Obs begin
+        @learned error_probs::Dict{String, ProbParameter{10.0, 50.0}}
+        height ~ Height
+        perpetrator ~ Perpetrator
+        error_prob_height = error_probs[height.height]
+        name ~ MaybeSwap(perpetrator.people.name, swap_possibilities["$(perpetrator.people.home_town)-name"], error_prob_height)
+    end
+end
+
+query = @query PerpetratorModel.Obs [
+    perpetrator_id perpetrator.perpetrator_id
+    perpetrator_date perpetrator.date
+    perpetrator_year perpetrator.year
+    perpetrator_location perpetrator.location
+    perpetrator_country perpetrator.country
+    perpetrator_killed perpetrator.killed
+    perpetrator_injured perpetrator.injured
+    people_id perpetrator.people.people_id
+    people_name perpetrator.people.name name
+    people_height height.height
+    people_weight perpetrator.people.weight
+    people_home_town perpetrator.people.home_town
+]
+
+A few additional rules about writing PClean programs:
+1. Column names in PClean programs should be lowercase, underscore-separated versions of the actual column names (e.g. no shortening names otherwise).
+2. The first name in each row of the final Query object should be an actual column name in the provided csv excerpt (to indicate to PClean which actual columns of the dataset the internal names refer to). In other words, this is the one place where the above rule does not hold, i.e. the query column names should use the original column's capitalization, spelling, etc.
+3.  Don't invent any new PClean library functions beyond those shown in the examples.
+
+Given this information, I will now provide a sample of a new dataset and an error description, and ask you to write a PClean program for it. Are you ready?
