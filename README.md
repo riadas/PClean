@@ -1,5 +1,26 @@
 # PClean
 
+### 6.5830 Final Project Experiments
+
+To run the one-shot generation experiments (Section 2.1.1):
+```
+bash src/generator/run_one_shot_generation.sh
+```
+To run the one-shot variant optimization experiments (Section 2.1.2):
+```
+bash src/generator/run_variant_optimization.sh
+```
+To run the question-asking experiment (Section 2.2):
+``` 
+bash src/generator/run_question_asking.sh
+```
+
+To generate the finetuning datasets (Section 3):
+```
+bash src/generator/generate_finetuning_datasets.sh
+```
+
+---
 [![Build Status](https://travis-ci.com/probcomp/PClean.svg?branch=master)](https://travis-ci.com/probcomp/PClean)
 
 PClean: A Domain-Specific Probabilistic Programming Language for Bayesian Data Cleaning

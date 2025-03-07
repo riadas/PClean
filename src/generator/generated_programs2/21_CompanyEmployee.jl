@@ -8,6 +8,10 @@ dirty_table = CSV.File("people_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("people_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
 
+subset_size = size(dirty_table, 1)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
 omitted = []
 if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "people id"], Any[0, "age"], Any[0, "name"], Any[0, "nationality"], Any[0, "graduation college"], Any[1, "company id"], Any[1, "name"], Any[1, "headquarters"], Any[1, "industry"], Any[1, "sales in billion"], Any[1, "profits in billion"], Any[1, "assets in billion"], Any[1, "market value in billion"], Any[2, "company id"], Any[2, "people id"], Any[2, "year working"]])
     for dirty_name in names(dirty_table)
@@ -19,15 +23,32 @@ end
 dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
 
 ## construct possibilities
-foreign_keys = ["people id", "company id"]
-column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "age"], Any[0, "name"], Any[0, "nationality"], Any[0, "graduation college"], Any[1, "name"], Any[1, "headquarters"], Any[1, "industry"], Any[1, "sales in billion"], Any[1, "profits in billion"], Any[1, "assets in billion"], Any[1, "market value in billion"], Any[2, "year working"]]
-if length(omitted) == 0 
-    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
-    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
-else
-    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
-    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "people id"], Any[0, "age"], Any[0, "name"], Any[0, "nationality"], Any[0, "graduation college"], Any[1, "company id"], Any[1, "name"], Any[1, "headquarters"], Any[1, "industry"], Any[1, "sales in billion"], Any[1, "profits in billion"], Any[1, "assets in billion"], Any[1, "market value in billion"], Any[2, "company id"], Any[2, "people id"], Any[2, "year working"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "people id"], Any[0, "age"], Any[0, "name"], Any[0, "nationality"], Any[0, "graduation college"], Any[1, "company id"], Any[1, "name"], Any[1, "headquarters"], Any[1, "industry"], Any[1, "sales in billion"], Any[1, "profits in billion"], Any[1, "assets in billion"], Any[1, "market value in billion"], Any[2, "company id"], Any[2, "people id"], Any[2, "year working"]]))
+            push!(omitted, dirty_name)
+        end
+    end
 end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+    
+## construct possibilities
+cols = Any[Any[-1, "*"], Any[0, "people id"], Any[0, "age"], Any[0, "name"], Any[0, "nationality"], Any[0, "graduation college"], Any[1, "company id"], Any[1, "name"], Any[1, "headquarters"], Any[1, "industry"], Any[1, "sales in billion"], Any[1, "profits in billion"], Any[1, "assets in billion"], Any[1, "market value in billion"], Any[2, "company id"], Any[2, "people id"], Any[2, "year working"]]
+foreign_keys = map(tup -> cols[tup[1] + 1], Any[Any[15, 1], Any[14, 6]])
+column_names_without_foreign_keys = filter(tup -> !(tup in foreign_keys), cols)
+matching_columns = []
+for col in dirty_columns 
+    println(col)
+    match_indices = findall(tup -> lowercase(join(split(join(split(tup[2], " "), ""), "_"), "")) == lowercase(join(split(join(split(col, " "), ""), "_"), "")), column_names_without_foreign_keys)
+    if length(match_indices) > 0
+        push!(matching_columns, column_names_without_foreign_keys[match_indices[1]][2])
+    else
+        error("matching column not found")
+    end
+end
+column_renaming_dict = Dict(zip(dirty_columns, matching_columns))
+column_renaming_dict_reverse = Dict(zip(matching_columns, dirty_columns))
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
@@ -43,9 +64,10 @@ possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
 
 
 
+
+
 PClean.@model CompanyEmployeeModel begin
     @class People begin
-        people_id ~ Unmodeled()
         age ~ ChooseUniformly(possibilities[:age])
         name ~ ChooseUniformly(possibilities[:name])
         nationality ~ ChooseUniformly(possibilities[:nationality])
@@ -53,7 +75,6 @@ PClean.@model CompanyEmployeeModel begin
     end
 
     @class Company begin
-        company_id ~ Unmodeled()
         name ~ ChooseUniformly(possibilities[:name])
         headquarters ~ ChooseUniformly(possibilities[:headquarters])
         industry ~ ChooseUniformly(possibilities[:industry])
@@ -64,7 +85,6 @@ PClean.@model CompanyEmployeeModel begin
     end
 
     @class Employment begin
-        company ~ Company
         people ~ People
         year_working ~ ChooseUniformly(possibilities[:year_working])
     end

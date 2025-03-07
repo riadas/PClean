@@ -8,6 +8,10 @@ dirty_table = CSV.File("swimmer_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("swimmer_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
 
+subset_size = size(dirty_table, 1)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
 omitted = []
 if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "nationality"], Any[0, "meter 100"], Any[0, "meter 200"], Any[0, "meter 300"], Any[0, "meter 400"], Any[0, "meter 500"], Any[0, "meter 600"], Any[0, "meter 700"], Any[0, "time"], Any[1, "id"], Any[1, "name"], Any[1, "capacity"], Any[1, "city"], Any[1, "country"], Any[1, "opening year"], Any[2, "id"], Any[2, "name"], Any[2, "stadium id"], Any[2, "year"], Any[3, "id"], Any[3, "result"], Any[3, "swimmer id"], Any[3, "event id"]])
     for dirty_name in names(dirty_table)
@@ -19,15 +23,32 @@ end
 dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
 
 ## construct possibilities
-foreign_keys = ["stadium id", "swimmer id", "event id"]
-column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "nationality"], Any[0, "meter 100"], Any[0, "meter 200"], Any[0, "meter 300"], Any[0, "meter 400"], Any[0, "meter 500"], Any[0, "meter 600"], Any[0, "meter 700"], Any[0, "time"], Any[1, "id"], Any[1, "name"], Any[1, "capacity"], Any[1, "city"], Any[1, "country"], Any[1, "opening year"], Any[2, "id"], Any[2, "name"], Any[2, "year"], Any[3, "id"], Any[3, "result"]]
-if length(omitted) == 0 
-    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
-    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
-else
-    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
-    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "nationality"], Any[0, "meter 100"], Any[0, "meter 200"], Any[0, "meter 300"], Any[0, "meter 400"], Any[0, "meter 500"], Any[0, "meter 600"], Any[0, "meter 700"], Any[0, "time"], Any[1, "id"], Any[1, "name"], Any[1, "capacity"], Any[1, "city"], Any[1, "country"], Any[1, "opening year"], Any[2, "id"], Any[2, "name"], Any[2, "stadium id"], Any[2, "year"], Any[3, "id"], Any[3, "result"], Any[3, "swimmer id"], Any[3, "event id"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "nationality"], Any[0, "meter 100"], Any[0, "meter 200"], Any[0, "meter 300"], Any[0, "meter 400"], Any[0, "meter 500"], Any[0, "meter 600"], Any[0, "meter 700"], Any[0, "time"], Any[1, "id"], Any[1, "name"], Any[1, "capacity"], Any[1, "city"], Any[1, "country"], Any[1, "opening year"], Any[2, "id"], Any[2, "name"], Any[2, "stadium id"], Any[2, "year"], Any[3, "id"], Any[3, "result"], Any[3, "swimmer id"], Any[3, "event id"]]))
+            push!(omitted, dirty_name)
+        end
+    end
 end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+    
+## construct possibilities
+cols = Any[Any[-1, "*"], Any[0, "id"], Any[0, "name"], Any[0, "nationality"], Any[0, "meter 100"], Any[0, "meter 200"], Any[0, "meter 300"], Any[0, "meter 400"], Any[0, "meter 500"], Any[0, "meter 600"], Any[0, "meter 700"], Any[0, "time"], Any[1, "id"], Any[1, "name"], Any[1, "capacity"], Any[1, "city"], Any[1, "country"], Any[1, "opening year"], Any[2, "id"], Any[2, "name"], Any[2, "stadium id"], Any[2, "year"], Any[3, "id"], Any[3, "result"], Any[3, "swimmer id"], Any[3, "event id"]]
+foreign_keys = map(tup -> cols[tup[1] + 1], Any[Any[20, 12], Any[24, 1], Any[25, 18]])
+column_names_without_foreign_keys = filter(tup -> !(tup in foreign_keys), cols)
+matching_columns = []
+for col in dirty_columns 
+    println(col)
+    match_indices = findall(tup -> lowercase(join(split(join(split(tup[2], " "), ""), "_"), "")) == lowercase(join(split(join(split(col, " "), ""), "_"), "")), column_names_without_foreign_keys)
+    if length(match_indices) > 0
+        push!(matching_columns, column_names_without_foreign_keys[match_indices[1]][2])
+    else
+        error("matching column not found")
+    end
+end
+column_renaming_dict = Dict(zip(dirty_columns, matching_columns))
+column_renaming_dict_reverse = Dict(zip(matching_columns, dirty_columns))
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
@@ -43,9 +64,10 @@ possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
 
 
 
+
+
 PClean.@model SwimmingModel begin
     @class Swimmer begin
-        id ~ Unmodeled()
         name ~ ChooseUniformly(possibilities[:name])
         nationality ~ ChooseUniformly(possibilities[:nationality])
         meter_100 ~ ChooseUniformly(possibilities[:meter_100])
@@ -59,7 +81,6 @@ PClean.@model SwimmingModel begin
     end
 
     @class Stadium begin
-        id ~ Unmodeled()
         name ~ ChooseUniformly(possibilities[:name])
         capacity ~ ChooseUniformly(possibilities[:capacity])
         city ~ ChooseUniformly(possibilities[:city])
@@ -68,7 +89,6 @@ PClean.@model SwimmingModel begin
     end
 
     @class Event begin
-        id ~ Unmodeled()
         name ~ ChooseUniformly(possibilities[:name])
         stadium ~ Stadium
         year ~ ChooseUniformly(possibilities[:year])
@@ -77,7 +97,6 @@ PClean.@model SwimmingModel begin
     @class Record begin
         id ~ Unmodeled()
         result ~ ChooseUniformly(possibilities[:result])
-        swimmer ~ Swimmer
         event ~ Event
     end
 
@@ -87,7 +106,6 @@ PClean.@model SwimmingModel begin
 end
 
 query = @query SwimmingModel.Obs [
-    swimmer_id record.swimmer.id
     swimmer_name record.swimmer.name
     swimmer_nationality record.swimmer.nationality
     swimmer_meter_100 record.swimmer.meter_100
@@ -98,13 +116,11 @@ query = @query SwimmingModel.Obs [
     swimmer_meter_600 record.swimmer.meter_600
     swimmer_meter_700 record.swimmer.meter_700
     swimmer_time record.swimmer.time
-    stadium_id record.event.stadium.id
     stadium_name record.event.stadium.name
     stadium_capacity record.event.stadium.capacity
     stadium_city record.event.stadium.city
     stadium_country record.event.stadium.country
     stadium_opening_year record.event.stadium.opening_year
-    event_id record.event.id
     event_name record.event.name
     event_year record.event.year
     record_id record.id

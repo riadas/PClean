@@ -506,14 +506,13 @@ function test_generation_conversation_json(table_json, mode="conversational_ters
         Given this dataset excerpt and error description, please respond with a PClean program that describes the schema of the datase and the errors it contains. In your response, don't include any other text other than the PClean program.
         """
         llm_response = program
-    
-        output_json = """{
-              "messages": [
-                    {"role": "system", "content": "You are a programmer helping write code from user instructions."},
-                    {"role": "user", "content": $(repr(user_message))},
-                    {"role": "assistant", "content": $(repr(llm_response))},
-                ]
-        }"""
+        
+        messages = [
+            """{"role": "system", "content": "You are a programmer helping write code from user instructions."}""",
+            """{"role": "user", "content": $(repr(user_message))}""",
+            """{"role": "assistant", "content": $(repr(llm_response))}""",
+        ]
+        output_json = """{"messages": [$(join(messages, ","))]}"""
         return output_json
     elseif mode == "conversational_long"
         user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
@@ -529,16 +528,15 @@ function test_generation_conversation_json(table_json, mode="conversational_ters
         """
         llm_response = program
         schema_description = generate_mechanical_schema_description(schema_json)
-    
-        output_json = """{
-              "messages": [
-                    {"role": "system", "content": "You are a programmer helping write code from user instructions."},
-                    {"role": "user", "content": $(repr(user_message))},
-                    {"role": "assistant", "content": "Yes! The following describes the schema: $(schema_description)"},
-                    {"role": "user", "content": "Awesome! Now, based on this schema and the previously provided error description, please write a PClean program that describes the schema of the dataset and the errors it contains. Please only include the PClean program in your response, without any preceding or following text."},
-                    {"role": "assistant", "content": $(repr(llm_response))},
-                ]
-        }"""
+        
+        messages = [
+            """{"role": "system", "content": "You are a programmer helping write code from user instructions."}""",
+            """{"role": "user", "content": $(repr(user_message))}""",
+            """{"role": "assistant", "content": "Yes! The following describes the schema: $(schema_description)"}""",
+            """{"role": "user", "content": "Awesome! Now, based on this schema and the previously provided error description, please write a PClean program that describes the schema of the dataset and the errors it contains. Please only include the PClean program in your response, without any preceding or following text."}""",
+            """{"role": "assistant", "content": $(repr(llm_response))}"""            
+        ]
+        output_json = """{"messages": [$(join(messages, ","))]}"""
         return output_json
     elseif mode == "instruct"
         user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
@@ -551,13 +549,113 @@ function test_generation_conversation_json(table_json, mode="conversational_ters
         Given this dataset excerpt and error description, please respond with a PClean program that describes the schema of the datase and the errors it contains. In your response, don't include any other text other than the PClean program.
         """
         llm_response = program
-        return """{
-            "prompt": $(repr(user_message)),
-            "completion": $(repr(llm_response)),
-        }"""
+        return """{"prompt": $(repr(user_message)), "completion": $(repr(llm_response))}"""
     end
 end
 
-function generate_prompts_and_completions()
+function demo_generation_conversation_json(table_json, mode="conversational_terse", subset_bool=false)
+    dataset_excerpt, schema_json, error_json, error_description, program = test_generation(table_json, subset_bool)
+    program = "PClean.@model$(split(program, "PClean.@model")[end])"
+    if mode == "conversational_terse" 
+        user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
+    
+        Dataset Excerpt:
+        $(dataset_excerpt)
+    
+        Error Description: $(error_description)
+    
+        Given this dataset excerpt and error description, please respond with a PClean program that describes the schema of the datase and the errors it contains. In your response, don't include any other text other than the PClean program.
+        """
+        llm_response = program
+        
+        messages = [
+            """{"role": "system", "content": "You are a programmer helping write code from user instructions."}""",
+            """{"role": "user", "content": "$(user_message)"}""",
+            """{"role": "assistant", "content": "$(llm_response)"}""",
+        ]
+        output_json = """{"messages": [$(join(messages, ",\n"))]}"""
+        return output_json
+    elseif mode == "conversational_long"
+        user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
+    
+        Dataset Excerpt:
+        $(dataset_excerpt)
+    
+        Error Description: $(error_description)
+    
+        Given this dataset excerpt and error description, the goal is to write a PClean program that describes the schema of the dataset and the errors it contains. 
 
+        A good first step is to describe the schema of the dataset, since the structure of the PClean program closely follows the dataset schema. Can you describe the schema of the given dataset, provided the excerpt above?
+        """
+        llm_response = program
+        schema_description = generate_mechanical_schema_description(schema_json)
+        
+        messages = [
+            """{"role": "system", "content": "You are a programmer helping write code from user instructions."}""",
+            """{"role": "user", "content": "$(user_message)"}""",
+            """{"role": "assistant", "content": "Yes! The following describes the schema: $(schema_description)"}""",
+            """{"role": "user", "content": "Awesome! Now, based on this schema and the previously provided error description, please write a PClean program that describes the schema of the dataset and the errors it contains. Please only include the PClean program in your response, without any preceding or following text."}""",
+            """{"role": "assistant", "content": "$(llm_response)"}"""            
+        ]
+        output_json = """{"messages": [$(join(messages, ",\n"))]}"""
+        return output_json
+    elseif mode == "instruct"
+        user_message = """PClean is a domain-specific language for dataset cleaning. In the following, I will provide an excerpt of a dataset to be cleaned, as well as a description of errors found in the dataset, and will ask you to write a PClean program that describes the schema of the dataset and its contained errors, which can be run to automatically fix the errors. 
+    
+        Dataset Excerpt:
+        $(dataset_excerpt)
+    
+        Error Description: $(error_description)
+    
+        Given this dataset excerpt and error description, please respond with a PClean program that describes the schema of the datase and the errors it contains. In your response, don't include any other text other than the PClean program.
+        """
+        llm_response = program
+        return """{"prompt": "$(user_message)",\n"completion": "$(llm_response)"}"""
+    end
+end
+
+function generate_prompts_and_completions(mode="conversational_long", num_subsets=0)
+    finetuning_jsons = []
+    tables = JSON.parsefile("src/generator/spider_data/tables.json")
+    skip = [41, 59, 95, 107, 113, 129]
+    error_tables = []
+    # first generate full joins
+    for i in 11:length(tables) # 1:length(tables)
+        if !(i in skip)
+            table_json = tables[i] 
+            try
+                finetuning_json = test_generation_conversation_json(table_json, mode)
+                push!(finetuning_jsons, finetuning_json)
+            catch e 
+                push!(error_tables, i)
+            end
+        end
+    end
+
+    # generate subsets
+    for i in 11:length(tables) # 1:length(tables)
+        table_json = tables[i]
+        if !(i in skip)
+            for j in 1:num_subsets 
+                try
+                    finetuning_json = test_generation_conversation_json(table_json, mode, true)
+                    push!(finetuning_jsons, finetuning_json)
+                catch e 
+                    push!(error_tables, i)
+                end 
+            end
+        end
+    end
+
+    finetuning_jsons = unique(finetuning_jsons)
+    error_tables = unique(error_tables)
+
+
+    filename = "dataset_mode_$(mode)_num_subsets_$(num_subsets).jsonl"
+    open("finetuning_datasets/$(filename)", "w") do f 
+        write(f, join(finetuning_jsons, "\n"))
+    end
+    output = readchomp(`python $(home_directory)/src/generator/format_finetuning_dataset.py $(filename)`)
+    println(output)
+    return error_tables
 end

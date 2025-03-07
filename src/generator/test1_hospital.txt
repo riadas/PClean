@@ -1,66 +1,60 @@
-Based on the dataset, I'll create a normalized database schema. Here's the JSON schema that follows the specified format:
+Based on the dataset, I'll create a normalized database schema. Here's the "tables.json" file:
 
 {
-  "db_id": "hospital_quality",
-  "table_names": [
-    "hospitals",
-    "measures",
-    "quality_reports"
-  ],
-  "column_names": [
-    [0, "provider_number"],
-    [0, "hospital_name"],
-    [0, "address1"],
-    [0, "city"],
-    [0, "state"],
-    [0, "zip_code"],
-    [0, "county_name"],
-    [0, "phone_number"],
-    [0, "hospital_type"],
-    [0, "hospital_owner"],
-    [0, "emergency_service"],
-    [1, "measure_code"],
-    [1, "measure_name"],
-    [1, "condition"],
-    [2, "hospital_id"],
-    [2, "measure_id"],
-    [2, "state_avg"]
-  ],
-  "column_types": [
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text",
-    "text"
-  ],
-  "foreign_keys": [
-    [14, 0],
-    [15, 11]
-  ],
-  "primary_keys": [
-    0,
-    11,
-    14
-  ]
+    "db_id": "hospital_quality",
+    "table_names": ["hospitals", "measures", "results"],
+    "column_names": [
+        [0, "provider_number"],
+        [0, "hospital_name"],
+        [0, "address1"],
+        [0, "city"],
+        [0, "state"],
+        [0, "zip_code"],
+        [0, "county_name"],
+        [0, "phone_number"],
+        [0, "hospital_type"],
+        [0, "hospital_owner"],
+        [0, "emergency_service"],
+        [1, "measure_code"],
+        [1, "measure_name"],
+        [1, "condition"],
+        [2, "provider_number"],
+        [2, "measure_code"],
+        [2, "state_avg"]
+    ],
+    "column_types": [
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text",
+        "text"
+    ],
+    "foreign_keys": [
+        [14, 0],
+        [15, 11]
+    ],
+    "primary_keys": [0, 11, 14]
 }
 
 This schema:
-1. Creates three normalized tables: hospitals, measures, and quality_reports
+1. Creates three tables: hospitals, measures, and results
 2. Omits the specified columns (Score, Sample, Address2, Address3)
 3. Establishes appropriate primary and foreign key relationships
-4. Uses appropriate data types for all columns
-5. Maintains referential integrity between tables
+4. Uses appropriate data types for each column
+5. Normalizes the data structure to reduce redundancy
 
-The schema represents a many-to-many relationship between hospitals and measures through the quality_reports table.
+The foreign keys show that:
+- results.provider_number references hospitals.provider_number
+- results.measure_code references measures.measure_code

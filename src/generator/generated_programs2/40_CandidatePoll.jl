@@ -8,6 +8,10 @@ dirty_table = CSV.File("candidate_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("candidate_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
 
+subset_size = size(dirty_table, 1)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
 omitted = []
 if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "candidate id"], Any[0, "people id"], Any[0, "poll source"], Any[0, "date"], Any[0, "support rate"], Any[0, "consider rate"], Any[0, "oppose rate"], Any[0, "unsure rate"], Any[1, "people id"], Any[1, "sex"], Any[1, "name"], Any[1, "date of birth"], Any[1, "height"], Any[1, "weight"]])
     for dirty_name in names(dirty_table)
@@ -19,15 +23,32 @@ end
 dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
 
 ## construct possibilities
-foreign_keys = ["people id"]
-column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "candidate id"], Any[0, "poll source"], Any[0, "date"], Any[0, "support rate"], Any[0, "consider rate"], Any[0, "oppose rate"], Any[0, "unsure rate"], Any[1, "sex"], Any[1, "name"], Any[1, "date of birth"], Any[1, "height"], Any[1, "weight"]]
-if length(omitted) == 0 
-    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
-    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
-else
-    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
-    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "candidate id"], Any[0, "people id"], Any[0, "poll source"], Any[0, "date"], Any[0, "support rate"], Any[0, "consider rate"], Any[0, "oppose rate"], Any[0, "unsure rate"], Any[1, "people id"], Any[1, "sex"], Any[1, "name"], Any[1, "date of birth"], Any[1, "height"], Any[1, "weight"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "candidate id"], Any[0, "people id"], Any[0, "poll source"], Any[0, "date"], Any[0, "support rate"], Any[0, "consider rate"], Any[0, "oppose rate"], Any[0, "unsure rate"], Any[1, "people id"], Any[1, "sex"], Any[1, "name"], Any[1, "date of birth"], Any[1, "height"], Any[1, "weight"]]))
+            push!(omitted, dirty_name)
+        end
+    end
 end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+    
+## construct possibilities
+cols = Any[Any[-1, "*"], Any[0, "candidate id"], Any[0, "people id"], Any[0, "poll source"], Any[0, "date"], Any[0, "support rate"], Any[0, "consider rate"], Any[0, "oppose rate"], Any[0, "unsure rate"], Any[1, "people id"], Any[1, "sex"], Any[1, "name"], Any[1, "date of birth"], Any[1, "height"], Any[1, "weight"]]
+foreign_keys = map(tup -> cols[tup[1] + 1], Any[Any[2, 9]])
+column_names_without_foreign_keys = filter(tup -> !(tup in foreign_keys), cols)
+matching_columns = []
+for col in dirty_columns 
+    println(col)
+    match_indices = findall(tup -> lowercase(join(split(join(split(tup[2], " "), ""), "_"), "")) == lowercase(join(split(join(split(col, " "), ""), "_"), "")), column_names_without_foreign_keys)
+    if length(match_indices) > 0
+        push!(matching_columns, column_names_without_foreign_keys[match_indices[1]][2])
+    else
+        error("matching column not found")
+    end
+end
+column_renaming_dict = Dict(zip(dirty_columns, matching_columns))
+column_renaming_dict_reverse = Dict(zip(matching_columns, dirty_columns))
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
@@ -43,9 +64,10 @@ possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
 
 
 
+
+
 PClean.@model CandidatePollModel begin
     @class People begin
-        people_id ~ Unmodeled()
         sex ~ ChooseUniformly(possibilities[:sex])
         name ~ ChooseUniformly(possibilities[:name])
         date_of_birth ~ ChooseUniformly(possibilities[:date_of_birth])
@@ -54,7 +76,6 @@ PClean.@model CandidatePollModel begin
     end
 
     @class Candidate begin
-        candidate_id ~ Unmodeled()
         people ~ People
         poll_source ~ ChooseUniformly(possibilities[:poll_source])
         date ~ ChooseUniformly(possibilities[:date])

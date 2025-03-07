@@ -1,4 +1,4 @@
-Based on the error description, this is a case of potential swaps in the time-related columns. The description suggests that different sources might report different times for the same flight, which means we need to identify possible swaps across rows that share the same flight number but have different sources.
+Based on the error description provided, this appears to be a case of value swaps, where arrival and departure times might be inconsistent across different sources for the same flight. Here's the appropriate error JSON:
 
 {
   "swaps": [
@@ -10,7 +10,7 @@ Based on the error description, this is a case of potential swaps in the time-re
 }
 
 This JSON indicates that:
-- For each of the time-related columns (scheduled/actual departure/arrival times), there might be swaps
-- These swaps occur across rows that share the same flight number ("flight")
-- The swaps are differentiated by different sources ("src")
-- We don't have any typos or unit errors mentioned in the description, so those fields are omitted
+- For each time-related column (scheduled/actual departure/arrival times), there might be inconsistencies
+- These inconsistencies occur for the same flight number (identified by the "flight" column)
+- The inconsistencies arise when the same flight is reported by different sources (the "src" column)
+- The other error types (typos and unit_errors) are omitted as they weren't mentioned in the error description

@@ -8,6 +8,10 @@ dirty_table = CSV.File("film_dirty.csv") |> DataFrame
 clean_table = CSV.File(replace("film_dirty.csv", "dirty.csv" => "clean.csv")) |> DataFrame
 
 
+subset_size = size(dirty_table, 1)
+dirty_table = first(dirty_table, subset_size)
+clean_table = first(clean_table, subset_size)
+
 omitted = []
 if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "film id"], Any[0, "rank in series"], Any[0, "number in season"], Any[0, "title"], Any[0, "directed by"], Any[0, "original air date"], Any[0, "production code"], Any[1, "cinema id"], Any[1, "name"], Any[1, "openning year"], Any[1, "capacity"], Any[1, "location"], Any[2, "cinema id"], Any[2, "film id"], Any[2, "date"], Any[2, "show times per day"], Any[2, "price"]])
     for dirty_name in names(dirty_table)
@@ -19,15 +23,32 @@ end
 dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
 
 ## construct possibilities
-foreign_keys = ["cinema id", "film id"]
-column_names_without_foreign_keys = Any[Any[-1, "*"], Any[0, "rank in series"], Any[0, "number in season"], Any[0, "title"], Any[0, "directed by"], Any[0, "original air date"], Any[0, "production code"], Any[1, "name"], Any[1, "openning year"], Any[1, "capacity"], Any[1, "location"], Any[2, "date"], Any[2, "show times per day"], Any[2, "price"]]
-if length(omitted) == 0 
-    column_renaming_dict = Dict(zip(dirty_columns, map(t -> t[2], column_names_without_foreign_keys)))
-    column_renaming_dict_reverse = Dict(zip(map(t -> t[2], column_names_without_foreign_keys), dirty_columns))
-else
-    column_renaming_dict = Dict(zip(sort(dirty_columns), sort(map(t -> t[2], column_names_without_foreign_keys))))
-    column_renaming_dict_reverse = Dict(zip(sort(map(t -> t[2], column_names_without_foreign_keys)), sort(dirty_columns)))    
+omitted = []
+if length(names(dirty_table)) != length(Any[Any[-1, "*"], Any[0, "film id"], Any[0, "rank in series"], Any[0, "number in season"], Any[0, "title"], Any[0, "directed by"], Any[0, "original air date"], Any[0, "production code"], Any[1, "cinema id"], Any[1, "name"], Any[1, "openning year"], Any[1, "capacity"], Any[1, "location"], Any[2, "cinema id"], Any[2, "film id"], Any[2, "date"], Any[2, "show times per day"], Any[2, "price"]])
+    for dirty_name in names(dirty_table)
+        if !(lowercase(join(split(dirty_name, " "), "")) in map(tup -> lowercase(join(split(tup[2], "_"), "")), Any[Any[-1, "*"], Any[0, "film id"], Any[0, "rank in series"], Any[0, "number in season"], Any[0, "title"], Any[0, "directed by"], Any[0, "original air date"], Any[0, "production code"], Any[1, "cinema id"], Any[1, "name"], Any[1, "openning year"], Any[1, "capacity"], Any[1, "location"], Any[2, "cinema id"], Any[2, "film id"], Any[2, "date"], Any[2, "show times per day"], Any[2, "price"]]))
+            push!(omitted, dirty_name)
+        end
+    end
 end
+dirty_columns = filter(n -> !(n in omitted), names(dirty_table))
+    
+## construct possibilities
+cols = Any[Any[-1, "*"], Any[0, "film id"], Any[0, "rank in series"], Any[0, "number in season"], Any[0, "title"], Any[0, "directed by"], Any[0, "original air date"], Any[0, "production code"], Any[1, "cinema id"], Any[1, "name"], Any[1, "openning year"], Any[1, "capacity"], Any[1, "location"], Any[2, "cinema id"], Any[2, "film id"], Any[2, "date"], Any[2, "show times per day"], Any[2, "price"]]
+foreign_keys = map(tup -> cols[tup[1] + 1], Any[Any[13, 8], Any[14, 1]])
+column_names_without_foreign_keys = filter(tup -> !(tup in foreign_keys), cols)
+matching_columns = []
+for col in dirty_columns 
+    println(col)
+    match_indices = findall(tup -> lowercase(join(split(join(split(tup[2], " "), ""), "_"), "")) == lowercase(join(split(join(split(col, " "), ""), "_"), "")), column_names_without_foreign_keys)
+    if length(match_indices) > 0
+        push!(matching_columns, column_names_without_foreign_keys[match_indices[1]][2])
+    else
+        error("matching column not found")
+    end
+end
+column_renaming_dict = Dict(zip(dirty_columns, matching_columns))
+column_renaming_dict_reverse = Dict(zip(matching_columns, dirty_columns))
 
 possibilities = Dict(Symbol(col) => Set() for col in values(column_renaming_dict))
 for r in eachrow(dirty_table)
@@ -43,9 +64,10 @@ possibilities = Dict(c => [possibilities[c]...] for c in keys(possibilities))
 
 
 
+
+
 PClean.@model CinemaModel begin
     @class Film begin
-        film_id ~ Unmodeled()
         rank_in_series ~ ChooseUniformly(possibilities[:rank_in_series])
         number_in_season ~ ChooseUniformly(possibilities[:number_in_season])
         title ~ ChooseUniformly(possibilities[:title])
@@ -55,7 +77,6 @@ PClean.@model CinemaModel begin
     end
 
     @class Cinema begin
-        cinema_id ~ Unmodeled()
         name ~ ChooseUniformly(possibilities[:name])
         openning_year ~ ChooseUniformly(possibilities[:openning_year])
         capacity ~ ChooseUniformly(possibilities[:capacity])
@@ -63,7 +84,6 @@ PClean.@model CinemaModel begin
     end
 
     @class Schedule begin
-        cinema ~ Cinema
         film ~ Film
         date ~ ChooseUniformly(possibilities[:date])
         show_times_per_day ~ ChooseUniformly(possibilities[:show_times_per_day])

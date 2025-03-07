@@ -14,16 +14,24 @@ function generate_program(table_index=1; random=false, custom=nothing, prior_spe
             open(custom_schema_file) do f 
                 global text = read(f, String)
             end
-            table = JSON.parse(split(text, "\n\n")[2])
+            table = JSON.parse(replace(replace(split(text, "\n\n")[2], "```" => ""), "json" => ""))
     
             open(custom_error_file) do f 
                 global text = read(f, String)
             end
-            error_json = JSON.parse(split(text, "\n\n")[2])
+            error_json = JSON.parse(replace(replace(filter(x -> occursin("{", x), split(text, "\n\n"))[1], "json" => ""), "```" => ""))
         else
             table, error_json = custom
             custom_data_file = "spider_dataset_excerpts/" + table["db_id"] + ".csv"
         end
+
+        column_names = table["column_names"]
+        # remove [-1, "*"] first column that Claude sometimes erroneously produces
+        if "*" in map(tup -> tup[2], column_names):
+            table["column_names"] = filter(tup -> tup[2] == "*", table["column_names"])
+            table["column_types"] = table["column_types"][2:end]
+            table["primary_keys"] = map(x -> x - 1, table["primary_keys"])
+            table["foreign_keys"] = map(tup -> map(x -> x - 1, tup), table["foreign_keys"])
 
         # remove foreign keys from error json -- already represented elsewhere
         if "typos" in keys(error_json)

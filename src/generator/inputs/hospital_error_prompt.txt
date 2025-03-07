@@ -1,0 +1,11 @@
+Awesome! Now, I will provide a description of errors in the dataset, and I would like you to format that error description into a JSON as well. That JSON should have the following information:
+
+*`typos`: An array of column names from the schema JSON, representing the column names that are described to likely contain typos. For example, ['Column A'].
+
+*`unit_errors`: An array containing elements of the following form: Each element is a length 2 array of a column name and the incorrect unit scale. For example, if a column named 'column_A' is described to have some values reported in bytes and others in megabytes, the value ['column_A', 1000000] should be in the `unit_errors` array. 
+
+*`swaps`: An array containing elements of the following form: Each element is a length 3 array of a column name and an array of column names that identify possible rows that the first column name's value is swapped with. For example, if the 'column_A' value in a row might be swapped with the 'column_A' value of other rows with the same 'column_B' value but different 'column_C' values, then ['column_A', ['column_B'], 'column_C'] should be in the `swaps` array.
+
+(If any of the above three error types does not exist, that field can be omitted entirely from the output JSON. Also, the column names must exactly match the column names in the original JSON you outputted for the database schema.)
+
+Error Description: There are typos in every column in the dataset.

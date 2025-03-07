@@ -1,0 +1,53 @@
+I've copied and pasted an excerpt of a dataset at the end of this message.
+Could you output the database schema (using only column values present in the dataset) in a JSON file called "table.json," with the following specification:
+`tables.json` should contain the following information:
+* `db_id`: database id
+* `table_names`: cleaned and normalized table names for each table in the schema.
+* `column_names`: original column names stored in the database. Each column looks like: `[0, "id"]`, where `0` is the index of a table name in `table_names`, and `"id"` is the column name.
+* `column_types`: list containing data type of each column, in the order of the column names described above. Possible data types are "text", "number", and "time".
+* `foreign_keys`: foreign keys in the database. `[3, 8]` means the third column in `column_name` is a foreign key reference to the eighth column.
+* `primary_keys`: list of primary keys in the database. Each number is the index of `column_names`.
+
+Dataset Excerpt:
+Column1,Room Type,Monthly Rent,County,State
+0,studio,486.0,Mahoning County,OH
+1,4br,2152.0,Clark County,NV
+2,1br,1267.0,Gwinnett County,GA
+3,3br,1180.0,Granville County,NC
+4,,1436.0,Suffolk County,NY
+5,2br,1768.0,Miami-Dade County,FL
+6,,585.0,Sebastian County,AR
+7,studio,599.0,Lapeer County,MI
+8,3br,3056.0,Monterey County,CA
+9,3br,1193.0,St. Louis County,MN
+10,4br,1364.0,Pickaway County,OH
+11,2br,1937.0,Los Angeles County,
+12,studio,960.0,Buncombe County,NC
+13,3br,922.0,Greene County,NC
+14,3br,2123.0,Pierce County,WA
+15,1br,892.0,Clark County,NV
+16,3br,1371.0,Hinds County,MS
+17,studio,756.0,Richland County,
+18,2br,1140.0,Cowlitz County,WA
+19,studio,1180.0,Broward County,FL
+20,3br,1148.0,Cuyahoga County,OH
+21,studio,641.0,Franklin County,OH
+22,,1089.0,Salt Lake County,UT
+23,,1452.0,Ketchikan Gateway Borough,AK
+24,studio,744.0,Salt Lake County,UT
+25,1br,824.0,York County,PA
+26,4br,1509.0,Lafayette Parish,LA
+27,1br,985.0,Pinellas County,FL
+28,4br,1723.0,Pinal County,AZ
+29,2br,727.0,Monroe County,MS
+30,2br,902.0,Barry County,MI
+31,2br,1681.0,Morris County,NJ
+32,3br,3181.0,Rockingham Counyt,NH
+33,studio,795.0,Smith County,TX
+34,,1704.0,Los Angeles County,CA
+35,2br,995.0,Marion County,IN
+36,2br,1022.0,Allegheny County,PA
+37,studio,454.0,Treutlen County,GA
+38,studio,1022.0,Broward County,
+39,4br,1658.0,Johnson County,KS
+40,1br,687.0,Burnett County,WI

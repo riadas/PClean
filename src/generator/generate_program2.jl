@@ -101,8 +101,8 @@ function generate_program2(table_index=1; random=false, custom=nothing, prior_sp
         else
             table = tables[rand(1:length(tables))]
         end
-        table_json["table_names"] = map(x -> replace(x, " " => "_"), table_json["table_names"])
-        error_json = JSON.parse("""{"swaps" : [["name", ["home_town"], "height"]]}""")
+        table["table_names"] = map(x -> replace(x, " " => "_"), table["table_names"])
+        error_json = JSON.parse("""{}""")
         possibilities = JSON.parse("{}")
         # error_json = JSON.parse("""{"swaps" : [["weight", ["killed"], "height"]]}""")
         possibilities = Dict([:name => ["100", "200"], :height => [68, 72], :home_town => ["20", "20", "30"]])
@@ -259,7 +259,8 @@ function generate_program2(table_index=1; random=false, custom=nothing, prior_sp
         run_inference!(tr, config)
     end
 
-    println(evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query))
+    accuracy = evaluate_accuracy(dirty_table, clean_table, tr.tables[:Obs], query)
+    println(accuracy)
     """
 end
 
@@ -677,12 +678,15 @@ end
 
 
 # for i in 1:length(tables)
-#     println("GENERATING")
-#     println(i)
-#     t = tables[i]
-#     name = join(map(x -> capitalize(x), split(t["db_id"], "_")), "")
-#     open("src/generator/generated_programs2/$(string(i))_$(name).jl", "w+") do file
-#         write(file, generate_program2(i))
+#     skip = [41, 59, 95, 107, 113, 129]
+#     if !(i in skip)
+#         println("GENERATING")
+#         println(i)
+#         t = tables[i]
+#         name = join(map(x -> capitalize(x), split(t["db_id"], "_")), "")
+#         open("src/generator/generated_programs2/$(string(i))_$(name).jl", "w+") do file
+#             write(file, generate_program2(i))
+#         end
 #     end
 # end
 

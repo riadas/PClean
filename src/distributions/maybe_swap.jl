@@ -1,3 +1,4 @@
+import Base
 struct MaybeSwap <: PCleanDistribution end
 
 supports_explicitly_missing_observations(::MaybeSwap) = true
@@ -48,6 +49,11 @@ mutable struct ProbParameter <: BasicParameter
   prior :: ProbParameterPrior
   heads :: Int
   tails :: Int
+end
+
+function Base.:*(p::ProbParameter, a::Float64)
+  p.current_value = p.current_value * a
+  p
 end
 
 default_prior(::Type{ProbParameter}) = ProbParameterPrior(1.0, 3.0)

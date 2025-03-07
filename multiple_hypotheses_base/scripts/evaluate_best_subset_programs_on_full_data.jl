@@ -3,8 +3,8 @@ home_directory = "/Users/riadas/Documents/phd/classes/databases/final_project/PC
 num_repeats = 3
 text = ""
 accuracy = 0
-for subset_size in [100] # , 200, 300
-    for method in ["direct_synthesis"] # ["synthesis_from_jsons", "direct_synthesis"]
+for subset_size in [100, 200, 300] # , 200, 300
+    for method in ["synthesis_from_jsons"] # ["synthesis_from_jsons", "direct_synthesis"]
         for benchmark in ["rents"] # "rents", "hospital", 
             results = []
             files = readdir("$(home_directory)/multiple_hypotheses_base/results/$(method)")
@@ -24,7 +24,7 @@ for subset_size in [100] # , 200, 300
             best_program_filename = subset_result[1]
             accuracies = []
             for i in 1:num_repeats 
-                include("$(home_directory)/multiple_hypotheses_base/hypotheses/$(method)/$(benchmark)/$(best_program_filename)")
+                include("$(home_directory)/multiple_hypotheses_base/hypotheses_copy/$(method)/$(benchmark)/$(best_program_filename)")
                 push!(accuracies, accuracy.f1)
             end
             println("ACCURACIES")
